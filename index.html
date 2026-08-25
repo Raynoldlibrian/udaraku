@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<title>Udaraku — Pemantau Kualitas Udara</title>
+<meta name="description" content="Pantau kualitas udara di kotamu secara langsung, dari data real-time.">
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B1220">
+<meta name="background-color" content="#0B1220">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+
+<!-- iOS home screen -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Udaraku">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<!-- Icons -->
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0B1220;
+    --surface: #121B2E;
+    --surface-2: #182642;
+    --line: #24324f;
+    --text: #E8EDF5;
+    --text-dim: #8B96AB;
+    --accent: #5EEAD4;
+    --accent-2: #FBBF24;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html{ -webkit-text-size-adjust:100%; }
+  html,body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow-x:hidden; overscroll-behavior-y:none;}
+
+  /* Mobile-first base (default = phone) */
+  #app{
+    max-width:560px; margin:0 auto; position:relative;
+    padding:calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 40px);
+  }
+
+  /* ---------- Header ---------- */
+  .brand{ display:flex; align-items:center; gap:9px; margin-bottom:18px; }
+  .brand .mark{ width:11px; height:11px; border-radius:50%; background:var(--accent); box-shadow:0 0 14px var(--accent); flex-shrink:0; }
+  .brand h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:0.01em; }
+  .brand span{ color:var(--text-dim); font-size:12px; display:none; }
+
+  .searchbar{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+  .searchbar input{
+    flex:1 1 100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
+    padding:14px 16px; border-radius:12px; font-family:'Inter',sans-serif; font-size:16px; outline:none;
+    transition:border-color .2s; -webkit-appearance:none;
+  }
+  .searchbar input:focus{ border-color:var(--accent); }
+  .searchbar .btnrow{ display:flex; gap:8px; width:100%; }
+  .searchbar button{
+    flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
+    padding:13px 14px; border-radius:12px; font-family:'Inter',sans-serif; font-size:14px; font-weight:500;
+    cursor:pointer; transition:all .2s; white-space:nowrap; min-height:46px;
+  }
+  .searchbar button:active{ transform:scale(0.97); }
+  .searchbar button:hover{ border-color:var(--accent); color:var(--accent); }
+  .searchbar button:focus-visible, .searchbar input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .hint{ font-size:12px; color:var(--text-dim); margin:10px 2px 20px; min-height:16px; line-height:1.5; }
+
+  /* ---------- Hero / particle readout ---------- */
+  .hero{
+    position:relative; border-radius:22px; overflow:hidden; border:1px solid var(--line);
+    background: radial-gradient(120% 100% at 50% 0%, var(--surface-2), var(--bg) 70%);
+    margin-bottom:22px; min-height:270px; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .hero canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  .hero-content{ position:relative; z-index:2; text-align:center; padding:30px 18px; width:100%; }
+  .loc-name{ font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--text-dim); margin-bottom:6px; letter-spacing:0.02em; overflow-wrap:break-word; }
+  .aqi-number{ font-family:'IBM Plex Mono',monospace; font-size:64px; font-weight:600; line-height:1; transition:color .5s; }
+  .aqi-label{ font-family:'Inter',sans-serif; font-size:13px; margin-top:4px; letter-spacing:0.05em; text-transform:uppercase; transition:color .5s; }
+  .aqi-sub{ color:var(--text-dim); font-size:13px; margin-top:14px; max-width:300px; margin-left:auto; margin-right:auto; line-height:1.55; }
+  .aqi-updated{ color:var(--text-dim); font-size:11px; margin-top:16px; font-family:'IBM Plex Mono',monospace; }
+
+  /* ---------- Pollutant grid ---------- */
+  .section-label{ font-family:'Space Grotesk',sans-serif; font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin:0 0 10px 2px; }
+  .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:26px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; }
+  .card .name{ font-size:12px; color:var(--text-dim); margin-bottom:8px; }
+  .card .val{ font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; }
+  .card .unit{ font-size:11px; color:var(--text-dim); margin-left:3px; }
+  .bar{ height:4px; border-radius:2px; background:var(--line); margin-top:10px; overflow:hidden; }
+  .bar i{ display:block; height:100%; border-radius:2px; transition:width .6s ease, background .5s; }
+
+  /* ---------- Trend ---------- */
+  .trend-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 14px 8px; margin-bottom:22px; }
+  .trend-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; flex-wrap:wrap; gap:4px; }
+  .trend-head h3{ font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:500; }
+  .trend-head span{ font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; }
+  #trendCanvas{ width:100%; height:100px; display:block; }
+
+  /* ---------- Scale legend ---------- */
+  .scale{ display:flex; border-radius:10px; overflow:hidden; margin-bottom:24px; height:8px; }
+  .scale i{ flex:1; }
+  .scale-labels{ display:flex; justify-content:space-between; font-size:10px; color:var(--text-dim); margin-top:6px; font-family:'IBM Plex Mono',monospace; }
+
+  footer{ text-align:center; color:var(--text-dim); font-size:11px; margin-top:8px; line-height:1.65; padding:0 6px; }
+  footer a{ color:var(--text-dim); }
+
+  .skeleton{ opacity:0.4; }
+  @media (prefers-reduced-motion: reduce){ * { animation:none !important; transition:none !important; } }
+
+  /* ---------- Tablet / desktop enhancements ---------- */
+  @media (min-width:640px){
+    #app{ max-width:920px; padding-top:28px; padding-bottom:80px; }
+    .brand{ margin-bottom:22px; }
+    .brand h1{ font-size:22px; }
+    .brand span{ display:inline; font-size:13px; }
+    .searchbar{ flex-wrap:nowrap; }
+    .searchbar input{ flex:1 1 auto; }
+    .searchbar .btnrow{ width:auto; }
+    .searchbar button{ flex:none; }
+    .hero{ min-height:320px; }
+    .aqi-number{ font-size:88px; }
+    .aqi-sub{ max-width:340px; }
+    .grid{ grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
+    #trendCanvas{ height:110px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><span>pemantau kualitas udara langsung</span></div>
+
+  <div class="searchbar">
+    <input id="cityInput" type="text" placeholder="Cari kota, mis. Rengat, Jakarta, Surabaya…" autocomplete="off" inputmode="search" enterkeyhint="search">
+    <div class="btnrow">
+      <button id="searchBtn">Cari</button>
+      <button id="geoBtn">📍 Lokasi saya</button>
+    </div>
+  </div>
+  <div class="hint" id="hint">Menampilkan data untuk Rengat, Riau.</div>
+
+  <div class="hero">
+    <canvas id="particleCanvas"></canvas>
+    <div class="hero-content">
+      <div class="loc-name" id="locName">Memuat…</div>
+      <div class="aqi-number" id="aqiNumber">--</div>
+      <div class="aqi-label" id="aqiLabel">MEMUAT DATA</div>
+      <div class="aqi-sub" id="aqiSub">Sedang mengambil data kualitas udara terbaru.</div>
+      <div class="aqi-updated" id="aqiUpdated"></div>
+    </div>
+  </div>
+
+  <div class="scale">
+    <i style="background:#5EEAD4"></i><i style="background:#FBBF24"></i><i style="background:#FB923C"></i><i style="background:#F87171"></i><i style="background:#C084FC"></i><i style="background:#7F1D1D"></i>
+  </div>
+  <div class="scale-labels"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300</span><span>500</span></div>
+
+  <div class="section-label">Rincian polutan</div>
+  <div class="grid" id="pollutantGrid"></div>
+
+  <div class="trend-wrap">
+    <div class="trend-head"><h3>Tren PM2.5 — 24 jam terakhir</h3><span id="trendRange">µg/m³</span></div>
+    <canvas id="trendCanvas"></canvas>
+  </div>
+
+  <footer>Data disediakan oleh <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>, diperbarui setiap jam. Indeks memakai skala US AQI.<br>Bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
+</div>
+
+<script>
+(function(){
+  const els = {
+    input: document.getElementById('cityInput'),
+    searchBtn: document.getElementById('searchBtn'),
+    geoBtn: document.getElementById('geoBtn'),
+    hint: document.getElementById('hint'),
+    locName: document.getElementById('locName'),
+    aqiNumber: document.getElementById('aqiNumber'),
+    aqiLabel: document.getElementById('aqiLabel'),
+    aqiSub: document.getElementById('aqiSub'),
+    aqiUpdated: document.getElementById('aqiUpdated'),
+    grid: document.getElementById('pollutantGrid'),
+    trendCanvas: document.getElementById('trendCanvas'),
+    trendRange: document.getElementById('trendRange'),
+    brandMark: document.getElementById('brandMark'),
+  };
+
+  const CATEGORIES = [
+    {max:50,  label:'Baik',                 color:'#5EEAD4', advice:'Kualitas udara baik. Aman untuk beraktivitas di luar ruangan.'},
+    {max:100, label:'Sedang',                color:'#FBBF24', advice:'Cukup dapat diterima. Kelompok sangat sensitif sebaiknya waspada.'},
+    {max:150, label:'Tidak sehat (sensitif)',color:'#FB923C', advice:'Kelompok sensitif (anak, lansia, penderita asma) sebaiknya kurangi aktivitas luar.'},
+    {max:200, label:'Tidak sehat',           color:'#F87171', advice:'Semua orang mulai bisa terdampak. Batasi aktivitas fisik lama di luar ruangan.'},
+    {max:300, label:'Sangat tidak sehat',    color:'#C084FC', advice:'Peringatan kesehatan. Hindari aktivitas luar ruangan bila memungkinkan.'},
+    {max:99999,label:'Berbahaya',            color:'#7F1D1D', advice:'Kondisi darurat kesehatan. Tetap di dalam ruangan dan gunakan penyaring udara.'},
+  ];
+  function categoryFor(aqi){ return CATEGORIES.find(c => aqi <= c.max) || CATEGORIES[CATEGORIES.length-1]; }
+
+  // ---------------- Particle field (signature element) ----------------
+  const canvas = document.getElementById('particleCanvas');
+  const ctx = canvas.getContext('2d');
+  let particles = [];
+  let particleColor = '#5EEAD4';
+  let density = 40;      // number of particles
+  let jitter = 0.3;      // how erratically they move
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resizeCanvas(){
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    initParticles(rect.width, rect.height);
+  }
+  function initParticles(w,h){
+    particles = [];
+    for(let i=0;i<density;i++){
+      particles.push({
+        x: Math.random()*w, y: Math.random()*h,
+        vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4,
+        r: 1 + Math.random()*2.2, o: 0.15 + Math.random()*0.35
+      });
+    }
+  }
+  function animate(){
+    const w = canvas.width/dpr, h = canvas.height/dpr;
+    ctx.clearRect(0,0,w,h);
+    for(const p of particles){
+      p.x += p.vx + (Math.random()-0.5)*jitter;
+      p.y += p.vy + (Math.random()-0.5)*jitter;
+      if(p.x<0) p.x=w; if(p.x>w) p.x=0;
+      if(p.y<0) p.y=h; if(p.y>h) p.y=0;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle = particleColor;
+      ctx.globalAlpha = p.o;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(animate);
+  }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+  requestAnimationFrame(animate);
+
+  function updateParticlesFor(aqi){
+    const cat = categoryFor(aqi);
+    particleColor = cat.color;
+    density = Math.round(18 + Math.min(aqi,300)/300 * 90);
+    jitter = 0.15 + Math.min(aqi,300)/300 * 1.6;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    initParticles(rect.width, rect.height);
+  }
+
+  // ---------------- Pollutant cards ----------------
+  const POLLUTANTS = [
+    {key:'pm2_5', name:'PM2.5', unit:'µg/m³', scaleMax:150},
+    {key:'pm10', name:'PM10', unit:'µg/m³', scaleMax:200},
+    {key:'ozone', name:'Ozon (O₃)', unit:'µg/m³', scaleMax:180},
+    {key:'nitrogen_dioxide', name:'NO₂', unit:'µg/m³', scaleMax:200},
+    {key:'sulphur_dioxide', name:'SO₂', unit:'µg/m³', scaleMax:200},
+    {key:'carbon_monoxide', name:'CO', unit:'µg/m³', scaleMax:4000},
+  ];
+  function renderPollutants(current){
+    els.grid.innerHTML = '';
+    POLLUTANTS.forEach(p=>{
+      const v = current[p.key];
+      const pct = v == null ? 0 : Math.max(4, Math.min(100, (v/p.scaleMax)*100));
+      const color = v == null ? '#8B96AB' : (pct>80 ? '#F87171' : pct>50 ? '#FBBF24' : '#5EEAD4');
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="name">${p.name}</div>
+        <div><span class="val">${v==null?'—':Math.round(v)}</span><span class="unit">${p.unit}</span></div>
+        <div class="bar"><i style="width:${pct}%; background:${color}"></i></div>
+      `;
+      els.grid.appendChild(card);
+    });
+  }
+
+  // ---------------- Trend chart ----------------
+  function renderTrend(hourly){
+    const tCanvas = els.trendCanvas;
+    const rect = tCanvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height || 110;
+    tCanvas.width = w*dpr; tCanvas.height = h*dpr;
+    tCanvas.style.height = h + 'px';
+    const tctx = tCanvas.getContext('2d');
+    tctx.setTransform(dpr,0,0,dpr,0,0);
+    tctx.clearRect(0,0,w,h);
+
+    const vals = hourly.pm2_5.slice(0,24);
+    const max = Math.max(...vals, 10);
+    const min = 0;
+    const stepX = w / (vals.length - 1);
+
+    // grid baseline
+    tctx.strokeStyle = '#24324f';
+    tctx.lineWidth = 1;
+    tctx.beginPath();
+    tctx.moveTo(0, h-16);
+    tctx.lineTo(w, h-16);
+    tctx.stroke();
+
+    // area
+    tctx.beginPath();
+    vals.forEach((v,i)=>{
+      const x = i*stepX;
+      const y = 8 + (1 - (v-min)/(max-min)) * (h-32);
+      if(i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
+    });
+    const lastX = (vals.length-1)*stepX;
+    tctx.lineTo(lastX, h-16);
+    tctx.lineTo(0, h-16);
+    tctx.closePath();
+    const grad = tctx.createLinearGradient(0,0,0,h);
+    grad.addColorStop(0,'rgba(94,234,212,0.28)');
+    grad.addColorStop(1,'rgba(94,234,212,0.0)');
+    tctx.fillStyle = grad;
+    tctx.fill();
+
+    // line
+    tctx.beginPath();
+    vals.forEach((v,i)=>{
+      const x = i*stepX;
+      const y = 8 + (1 - (v-min)/(max-min)) * (h-32);
+      if(i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
+    });
+    tctx.strokeStyle = '#5EEAD4';
+    tctx.lineWidth = 2;
+    tctx.stroke();
+
+    els.trendRange.textContent = `puncak ${Math.round(max)} µg/m³`;
+  }
+
+  // ---------------- Data fetching ----------------
+  async function geocode(name){
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=id&format=json`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.results || !data.results.length) throw new Error('Kota tidak ditemukan');
+    const r = data.results[0];
+    return { lat:r.latitude, lon:r.longitude, label: [r.name, r.admin1, r.country].filter(Boolean).join(', ') };
+  }
+
+  async function fetchAirQuality(lat, lon, label){
+    setLoadingState();
+    try{
+      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=pm2_5,us_aqi&timezone=auto&forecast_days=1`;
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('Gagal mengambil data');
+      const data = await res.json();
+      renderAll(data, label);
+    }catch(err){
+      els.hint.textContent = 'Gagal memuat data: ' + err.message + '. Coba kota lain.';
+    }
+  }
+
+  function setLoadingState(){
+    els.aqiNumber.textContent = '--';
+    els.aqiLabel.textContent = 'MEMUAT DATA';
+    els.aqiSub.textContent = 'Sedang mengambil data kualitas udara terbaru.';
+    els.locName.classList.add('skeleton');
+  }
+
+  function renderAll(data, label){
+    const cur = data.current;
+    const aqi = Math.round(cur.us_aqi ?? 0);
+    const cat = categoryFor(aqi);
+
+    els.locName.classList.remove('skeleton');
+    els.locName.textContent = label;
+    els.aqiNumber.textContent = aqi;
+    els.aqiNumber.style.color = cat.color;
+    els.aqiLabel.textContent = cat.label.toUpperCase() + ' · US AQI';
+    els.aqiLabel.style.color = cat.color;
+    els.aqiSub.textContent = cat.advice;
+    els.aqiUpdated.textContent = 'Diperbarui ' + new Date(cur.time).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
+    els.brandMark.style.background = cat.color;
+    els.brandMark.style.boxShadow = `0 0 14px ${cat.color}`;
+
+    updateParticlesFor(aqi);
+    renderPollutants(cur);
+    renderTrend(data.hourly);
+  }
+
+  async function searchCity(name){
+    if(!name.trim()) return;
+    els.hint.textContent = `Mencari "${name}"…`;
+    try{
+      const loc = await geocode(name);
+      els.hint.textContent = `Menampilkan data untuk ${loc.label}.`;
+      fetchAirQuality(loc.lat, loc.lon, loc.label);
+    }catch(err){
+      els.hint.textContent = err.message + '. Coba nama kota lain.';
+    }
+  }
+
+  function useMyLocation(){
+    if(!navigator.geolocation){ els.hint.textContent = 'Geolokasi tidak didukung di perangkat ini.'; return; }
+    els.hint.textContent = 'Mengambil lokasi Anda…';
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const {latitude, longitude} = pos.coords;
+      els.hint.textContent = 'Menampilkan data untuk lokasi Anda saat ini.';
+      fetchAirQuality(latitude, longitude, 'Lokasi Anda saat ini');
+    }, err=>{
+      els.hint.textContent = 'Tidak bisa mengambil lokasi: ' + err.message;
+    });
+  }
+
+  els.searchBtn.addEventListener('click', ()=> searchCity(els.input.value));
+  els.input.addEventListener('keydown', e=>{ if(e.key==='Enter') searchCity(els.input.value); });
+  els.geoBtn.addEventListener('click', useMyLocation);
+
+  // Initial load — default to Rengat
+  searchCity('Rengat');
+
+  // Register service worker (enables install prompt + offline app shell)
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{ /* file:// or unsupported host — ignore */ });
+    });
+  }
+})();
+</script>
+</body>
+</html>
