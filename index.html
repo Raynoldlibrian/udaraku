@@ -79,16 +79,28 @@
   .hero canvas{ position:absolute; inset:0; width:100%; height:100%; }
   .hero-content{ position:relative; z-index:2; text-align:center; padding:30px 18px; width:100%; }
   .loc-name{ font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--text-dim); margin-bottom:6px; letter-spacing:0.02em; overflow-wrap:break-word; }
+
+  .indextoggle{ display:inline-flex; background:rgba(255,255,255,0.05); border:1px solid var(--line); border-radius:999px; padding:3px; margin-bottom:14px; }
+  .indextoggle button{
+    border:none; background:transparent; color:var(--text-dim); font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
+    padding:7px 14px; border-radius:999px; cursor:pointer; transition:all .2s; letter-spacing:0.02em;
+  }
+  .indextoggle button.active{ background:var(--surface); color:var(--text); }
+  .indextoggle button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
   .aqi-number{ font-family:'IBM Plex Mono',monospace; font-size:64px; font-weight:600; line-height:1; transition:color .5s; }
   .aqi-label{ font-family:'Inter',sans-serif; font-size:13px; margin-top:4px; letter-spacing:0.05em; text-transform:uppercase; transition:color .5s; }
   .aqi-sub{ color:var(--text-dim); font-size:13px; margin-top:14px; max-width:300px; margin-left:auto; margin-right:auto; line-height:1.55; }
   .aqi-updated{ color:var(--text-dim); font-size:11px; margin-top:16px; font-family:'IBM Plex Mono',monospace; }
+  .dominant{ display:inline-block; margin-top:12px; font-size:11px; color:var(--text-dim); background:rgba(255,255,255,0.05); border:1px solid var(--line); border-radius:8px; padding:5px 10px; }
+  .dominant b{ color:var(--text); font-weight:600; }
 
   /* ---------- Pollutant grid ---------- */
   .section-label{ font-family:'Space Grotesk',sans-serif; font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin:0 0 10px 2px; }
   .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:26px; }
-  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; }
-  .card .name{ font-size:12px; color:var(--text-dim); margin-bottom:8px; }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; position:relative; }
+  .card .name{ font-size:12px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .card .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
   .card .val{ font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; }
   .card .unit{ font-size:11px; color:var(--text-dim); margin-left:3px; }
   .bar{ height:4px; border-radius:2px; background:var(--line); margin-top:10px; overflow:hidden; }
@@ -148,17 +160,22 @@
     <canvas id="particleCanvas"></canvas>
     <div class="hero-content">
       <div class="loc-name" id="locName">Memuat…</div>
+      <div class="indextoggle" id="indexToggle" role="group" aria-label="Pilih standar indeks">
+        <button id="btnISPU" class="active" type="button">ISPU (Indonesia)</button>
+        <button id="btnAQI" type="button">AQI (US)</button>
+      </div>
       <div class="aqi-number" id="aqiNumber">--</div>
       <div class="aqi-label" id="aqiLabel">MEMUAT DATA</div>
       <div class="aqi-sub" id="aqiSub">Sedang mengambil data kualitas udara terbaru.</div>
+      <div class="dominant" id="dominant" style="display:none;">Parameter dominan: <b id="dominantParam">—</b></div>
       <div class="aqi-updated" id="aqiUpdated"></div>
     </div>
   </div>
 
-  <div class="scale">
-    <i style="background:#5EEAD4"></i><i style="background:#FBBF24"></i><i style="background:#FB923C"></i><i style="background:#F87171"></i><i style="background:#C084FC"></i><i style="background:#7F1D1D"></i>
+  <div class="scale" id="scaleBar">
+    <i style="background:#22C55E"></i><i style="background:#3B82F6"></i><i style="background:#FACC15"></i><i style="background:#EF4444"></i><i style="background:#18181B"></i>
   </div>
-  <div class="scale-labels"><span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300</span><span>500</span></div>
+  <div class="scale-labels" id="scaleLabels"><span>0</span><span>50</span><span>100</span><span>200</span><span>300</span><span>500</span></div>
 
   <div class="section-label">Rincian polutan</div>
   <div class="grid" id="pollutantGrid"></div>
@@ -168,7 +185,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Data disediakan oleh <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>, diperbarui setiap jam. Indeks memakai skala US AQI.<br>Bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
 
 <script>
@@ -187,7 +204,17 @@
     trendCanvas: document.getElementById('trendCanvas'),
     trendRange: document.getElementById('trendRange'),
     brandMark: document.getElementById('brandMark'),
+    btnISPU: document.getElementById('btnISPU'),
+    btnAQI: document.getElementById('btnAQI'),
+    dominant: document.getElementById('dominant'),
+    dominantParam: document.getElementById('dominantParam'),
+    scaleBar: document.getElementById('scaleBar'),
+    scaleLabels: document.getElementById('scaleLabels'),
   };
+
+  let currentMode = 'ispu'; // 'ispu' | 'aqi'
+  let lastData = null;
+  let lastLabel = '';
 
   const CATEGORIES = [
     {max:50,  label:'Baik',                 color:'#5EEAD4', advice:'Kualitas udara baik. Aman untuk beraktivitas di luar ruangan.'},
@@ -198,6 +225,55 @@
     {max:99999,label:'Berbahaya',            color:'#7F1D1D', advice:'Kondisi darurat kesehatan. Tetap di dalam ruangan dan gunakan penyaring udara.'},
   ];
   function categoryFor(aqi){ return CATEGORIES.find(c => aqi <= c.max) || CATEGORIES[CATEGORIES.length-1]; }
+
+  // ---------------- ISPU (Indeks Standar Pencemar Udara — Permen LHK No. P.14/2020) ----------------
+  // Breakpoint konsentrasi resmi (µg/m³), 6 dari 7 parameter (HC tidak tersedia dari sumber data ini).
+  const ISPU_BREAKPOINTS = {
+    pm10:               [0, 50, 150, 350, 420, 500],
+    pm2_5:               [0, 15.5, 55.4, 150.4, 250.4, 500],
+    sulphur_dioxide:      [0, 52, 180, 400, 800, 1200],
+    carbon_monoxide:      [0, 4000, 8000, 15000, 30000, 45000],
+    ozone:                [0, 120, 235, 400, 800, 1000],
+    nitrogen_dioxide:     [0, 80, 200, 1130, 2260, 3000],
+  };
+  const ISPU_ILEVELS = [0, 50, 100, 200, 300, 500];
+  const ISPU_PARAM_LABEL = { pm10:'PM10', pm2_5:'PM2.5', sulphur_dioxide:'SO₂', carbon_monoxide:'CO', ozone:'O₃', nitrogen_dioxide:'NO₂' };
+  const ISPU_CATEGORIES = [
+    {max:50,  label:'Baik',               color:'#22C55E', advice:'Kualitas udara sangat baik, aman untuk semua aktivitas di luar ruangan.'},
+    {max:100, label:'Sedang',              color:'#3B82F6', advice:'Kualitas udara masih dapat diterima. Kelompok sensitif sebaiknya kurangi aktivitas fisik berat di luar.'},
+    {max:200, label:'Tidak Sehat',         color:'#FACC15', advice:'Mulai merugikan kesehatan. Gunakan masker dan kurangi aktivitas di luar ruangan.'},
+    {max:300, label:'Sangat Tidak Sehat',  color:'#EF4444', advice:'Risiko kesehatan meningkat untuk semua orang. Disarankan tetap di dalam rumah.'},
+    {max:99999,label:'Berbahaya',          color:'#18181B', glow:'#EF4444', advice:'Kondisi darurat. Semua orang sebaiknya tidak beraktivitas di luar rumah.'},
+  ];
+  function ispuCategoryFor(v){ return ISPU_CATEGORIES.find(c => v <= c.max) || ISPU_CATEGORIES[ISPU_CATEGORIES.length-1]; }
+  // Warna asli 'Berbahaya' adalah hitam (sesuai standar resmi) — untuk elemen visual di atas
+  // background gelap kita pakai warna glow-nya (merah tua) supaya tetap kelihatan, label tetap "Berbahaya".
+  function displayColor(cat){ return cat.glow || cat.color; }
+
+  function ispuSubIndex(paramKey, concentration){
+    if(concentration == null || isNaN(concentration)) return null;
+    const bp = ISPU_BREAKPOINTS[paramKey];
+    for(let i=0;i<5;i++){
+      const Clow = bp[i], Chigh = bp[i+1];
+      if(concentration <= Chigh || i===4){
+        const Ilow = ISPU_ILEVELS[i], Ihigh = ISPU_ILEVELS[i+1];
+        const c = i===4 ? Math.max(concentration, Clow) : Math.max(Math.min(concentration, Chigh), Clow);
+        return Math.round(((Ihigh-Ilow)/(Chigh-Clow)) * (c-Clow) + Ilow);
+      }
+    }
+  }
+
+  // Hitung ISPU keseluruhan = nilai maksimum dari sub-indeks tiap parameter (sesuai metode resmi KLHK).
+  function computeISPU(current){
+    let best = null;
+    for(const key of Object.keys(ISPU_BREAKPOINTS)){
+      const sub = ispuSubIndex(key, current[key]);
+      if(sub != null && (best == null || sub > best.value)){
+        best = { value: sub, param: key };
+      }
+    }
+    return best; // {value, param} or null
+  }
 
   // ---------------- Particle field (signature element) ----------------
   const canvas = document.getElementById('particleCanvas');
@@ -248,11 +324,11 @@
   resizeCanvas();
   requestAnimationFrame(animate);
 
-  function updateParticlesFor(aqi){
-    const cat = categoryFor(aqi);
-    particleColor = cat.color;
-    density = Math.round(18 + Math.min(aqi,300)/300 * 90);
-    jitter = 0.15 + Math.min(aqi,300)/300 * 1.6;
+  function updateParticlesFor(color, intensity){
+    // intensity: 0..1 relative severity, drives density & jitter of the particle field
+    particleColor = color;
+    density = Math.round(18 + intensity * 90);
+    jitter = 0.15 + intensity * 1.6;
     const rect = canvas.parentElement.getBoundingClientRect();
     initParticles(rect.width, rect.height);
   }
@@ -271,13 +347,14 @@
     POLLUTANTS.forEach(p=>{
       const v = current[p.key];
       const pct = v == null ? 0 : Math.max(4, Math.min(100, (v/p.scaleMax)*100));
-      const color = v == null ? '#8B96AB' : (pct>80 ? '#F87171' : pct>50 ? '#FBBF24' : '#5EEAD4');
+      const sub = ispuSubIndex(p.key, v);
+      const dotColor = sub == null ? '#8B96AB' : displayColor(ispuCategoryFor(sub));
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = `
-        <div class="name">${p.name}</div>
+        <div class="name"><span class="dot" style="background:${dotColor}"></span>${p.name}</div>
         <div><span class="val">${v==null?'—':Math.round(v)}</span><span class="unit">${p.unit}</span></div>
-        <div class="bar"><i style="width:${pct}%; background:${color}"></i></div>
+        <div class="bar"><i style="width:${pct}%; background:${dotColor}"></i></div>
       `;
       els.grid.appendChild(card);
     });
@@ -366,28 +443,76 @@
     els.aqiLabel.textContent = 'MEMUAT DATA';
     els.aqiSub.textContent = 'Sedang mengambil data kualitas udara terbaru.';
     els.locName.classList.add('skeleton');
+    els.dominant.style.display = 'none';
   }
 
   function renderAll(data, label){
-    const cur = data.current;
-    const aqi = Math.round(cur.us_aqi ?? 0);
-    const cat = categoryFor(aqi);
-
+    lastData = data;
+    lastLabel = label;
     els.locName.classList.remove('skeleton');
     els.locName.textContent = label;
-    els.aqiNumber.textContent = aqi;
-    els.aqiNumber.style.color = cat.color;
-    els.aqiLabel.textContent = cat.label.toUpperCase() + ' · US AQI';
-    els.aqiLabel.style.color = cat.color;
-    els.aqiSub.textContent = cat.advice;
-    els.aqiUpdated.textContent = 'Diperbarui ' + new Date(cur.time).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
-    els.brandMark.style.background = cat.color;
-    els.brandMark.style.boxShadow = `0 0 14px ${cat.color}`;
+    els.aqiUpdated.textContent = 'Diperbarui ' + new Date(data.current.time).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
 
-    updateParticlesFor(aqi);
-    renderPollutants(cur);
+    renderIndex();
+    renderPollutants(data.current);
     renderTrend(data.hourly);
   }
+
+  function renderIndex(){
+    if(!lastData) return;
+    const cur = lastData.current;
+
+    if(currentMode === 'ispu'){
+      const result = computeISPU(cur);
+      const value = result ? result.value : 0;
+      const cat = ispuCategoryFor(value);
+      const color = displayColor(cat);
+
+      els.aqiNumber.textContent = result ? value : '—';
+      els.aqiNumber.style.color = color;
+      els.aqiLabel.textContent = cat.label.toUpperCase() + ' · ISPU';
+      els.aqiLabel.style.color = color;
+      els.aqiSub.textContent = cat.advice;
+      els.brandMark.style.background = color;
+      els.brandMark.style.boxShadow = `0 0 14px ${color}`;
+      updateParticlesFor(color, Math.min(value,300)/300);
+
+      if(result){
+        els.dominant.style.display = 'inline-block';
+        els.dominantParam.textContent = ISPU_PARAM_LABEL[result.param];
+      } else {
+        els.dominant.style.display = 'none';
+      }
+      els.scaleBar.innerHTML = ISPU_CATEGORIES.map(c=>`<i style="background:${displayColor(c)}"></i>`).join('');
+      els.scaleLabels.innerHTML = '<span>0</span><span>50</span><span>100</span><span>200</span><span>300</span><span>500</span>';
+    } else {
+      const aqi = Math.round(cur.us_aqi ?? 0);
+      const cat = categoryFor(aqi);
+
+      els.aqiNumber.textContent = aqi;
+      els.aqiNumber.style.color = cat.color;
+      els.aqiLabel.textContent = cat.label.toUpperCase() + ' · US AQI';
+      els.aqiLabel.style.color = cat.color;
+      els.aqiSub.textContent = cat.advice;
+      els.brandMark.style.background = cat.color;
+      els.brandMark.style.boxShadow = `0 0 14px ${cat.color}`;
+      updateParticlesFor(cat.color, Math.min(aqi,300)/300);
+
+      els.dominant.style.display = 'none';
+      els.scaleBar.innerHTML = CATEGORIES.map(c=>`<i style="background:${c.color}"></i>`).join('');
+      els.scaleLabels.innerHTML = '<span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300</span><span>500</span>';
+    }
+  }
+
+  function setMode(mode){
+    if(currentMode === mode) return;
+    currentMode = mode;
+    els.btnISPU.classList.toggle('active', mode==='ispu');
+    els.btnAQI.classList.toggle('active', mode==='aqi');
+    renderIndex();
+  }
+  els.btnISPU.addEventListener('click', ()=> setMode('ispu'));
+  els.btnAQI.addEventListener('click', ()=> setMode('aqi'));
 
   async function searchCity(name){
     if(!name.trim()) return;
