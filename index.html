@@ -38,7 +38,7 @@
   }
   *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
   html{ -webkit-text-size-adjust:100%; }
-  html,body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow-x:hidden; overscroll-behavior-y:none;}
+  html,body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain;}
 
   /* Mobile-first base (default = phone) */
   #app{
@@ -133,10 +133,10 @@
 <body>
 <div id="app">
 
-  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><br>pemantau kualitas udara langsung</div>
+  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><span>pemantau kualitas udara langsung</span></div>
 
   <div class="searchbar">
-    <input id="cityInput" type="text" placeholder="Cari kota, mis. Lirik, Peranap, Airmolek…" autocomplete="off" inputmode="search" enterkeyhint="search">
+    <input id="cityInput" type="text" placeholder="Cari kota, mis. Rengat, Jakarta, Surabaya…" autocomplete="off" inputmode="search" enterkeyhint="search">
     <div class="btnrow">
       <button id="searchBtn">Cari</button>
       <button id="geoBtn">📍 Lokasi saya</button>
@@ -168,7 +168,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Data disediakan oleh <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>, diperbarui setiap jam. Indeks memakai skala US AQI.<br>Dinas Lingkungan Hidup Kebersihan Pertamanan - Raynold 2026</footer>
+  <footer>Data disediakan oleh <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a>, diperbarui setiap jam. Indeks memakai skala US AQI.<br>Bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
 
 <script>
