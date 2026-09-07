@@ -68,6 +68,16 @@
     background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
   }
   .searchbar select:focus{ border-color:var(--accent); }
+
+  .infobtn{
+    width:100%; background:linear-gradient(135deg, var(--surface-2), var(--surface));
+    border:1px solid var(--line); color:var(--text); padding:15px 16px; border-radius:12px;
+    font-family:'Inter',sans-serif; font-size:14px; font-weight:600; cursor:pointer;
+    transition:all .2s; margin-bottom:6px;
+  }
+  .infobtn:hover{ border-color:var(--accent); }
+  .infobtn:active{ transform:scale(0.98); }
+  .infobtn:disabled{ opacity:0.6; cursor:default; transform:none; }
   .searchbar .btnrow{ display:flex; gap:8px; width:100%; }
   .searchbar button{
     flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
@@ -163,6 +173,11 @@
     </select>
   </div>
 
+  <button id="infographicBtn" type="button" class="infobtn">
+    <span id="infographicBtnText">📊 Unduh Infografis Kabupaten</span>
+  </button>
+  <div class="hint" id="infographicHint"></div>
+
   <div class="section-label">Atau cari lokasi lain</div>
   <div class="searchbar">
     <input id="cityInput" type="text" placeholder="Nama kota, atau tempel koordinat dari Google Maps (mis. -0.4167, 102.5667)…" autocomplete="off" inputmode="search" enterkeyhint="search">
@@ -202,8 +217,11 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.<br>&copy Raynold - 2026</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
+
+<!-- Template infografis (di-render off-screen, ditangkap jadi PNG saat tombol unduh diklik) -->
+<div id="infographicTemplate" style="position:fixed; left:-99999px; top:0; width:1080px;"></div>
 
 <script>
 (function(){
@@ -228,6 +246,10 @@
     scaleBar: document.getElementById('scaleBar'),
     scaleLabels: document.getElementById('scaleLabels'),
     kecamatanSelect: document.getElementById('kecamatanSelect'),
+    infographicBtn: document.getElementById('infographicBtn'),
+    infographicBtnText: document.getElementById('infographicBtnText'),
+    infographicHint: document.getElementById('infographicHint'),
+    infographicTemplate: document.getElementById('infographicTemplate'),
   };
 
   // ---------------- Data 14 kecamatan Kabupaten Indragiri Hulu, Riau ----------------
@@ -316,6 +338,165 @@
     }
     return best; // {value, param} or null
   }
+
+  // ---------------- Infografis Kabupaten (unduh PNG) ----------------
+  let html2canvasLoadPromise = null;
+  function loadHtml2Canvas(){
+    if(window.html2canvas) return Promise.resolve();
+    if(html2canvasLoadPromise) return html2canvasLoadPromise;
+    html2canvasLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Gagal memuat pustaka render gambar.'));
+      document.head.appendChild(s);
+    });
+    return html2canvasLoadPromise;
+  }
+
+  async function fetchAllKecamatan(){
+    const lats = KECAMATAN_INHU.map(k=>k.lat).join(',');
+    const lons = KECAMATAN_INHU.map(k=>k.lon).join(',');
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('status ' + res.status);
+    const data = await res.json();
+    const results = Array.isArray(data) ? data : [data];
+    return KECAMATAN_INHU.map((k,i)=>{
+      const cur = results[i] && results[i].current;
+      const ispu = cur ? computeISPU(cur) : null;
+      const value = ispu ? ispu.value : null;
+      const cat = value != null ? ispuCategoryFor(value) : null;
+      return { kec:k, ispu, value, cat };
+    });
+  }
+
+  function buildInfographicHTML(items){
+    const sorted = items.slice().sort((a,b)=>{
+      if(a.value == null) return 1;
+      if(b.value == null) return -1;
+      return b.value - a.value; // terparah (nilai tertinggi) dulu
+    });
+    const withValue = sorted.filter(it => it.value != null);
+    const worst = withValue[0];
+    const safest = withValue[withValue.length-1];
+    const median = withValue[Math.floor(withValue.length/2)];
+
+    const now = new Date();
+    const tanggal = now.toLocaleString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit' });
+
+    const counts = {};
+    items.forEach(it=>{
+      const label = it.cat ? it.cat.label : 'Tidak diketahui';
+      counts[label] = (counts[label]||0) + 1;
+    });
+    const order = ['Baik','Sedang','Tidak Sehat','Sangat Tidak Sehat','Berbahaya'];
+    const pillsHTML = order.filter(l=>counts[l]).map(label=>{
+      const c = ISPU_CATEGORIES.find(x=>x.label===label);
+      const color = c ? displayColor(c) : '#8B96AB';
+      return `<span style="display:inline-block; font-size:20px; font-family:'IBM Plex Mono',monospace; padding:10px 20px; border-radius:999px; border:2px solid ${color}; color:${color}; margin:0 8px 8px 0;"><b>${counts[label]}</b>&nbsp; ${label}</span>`;
+    }).join('');
+
+    function headlineCard(it, big){
+      if(!it) return '';
+      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+      return `
+        <div style="flex:1; background:#121B2E; border:1px solid #24324f; border-top:5px solid ${color}; border-radius:18px; padding:28px 22px; text-align:center;">
+          <div style="font-family:'Inter',sans-serif; font-size:16px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">Status ISPU</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:${big?64:52}px; font-weight:600; color:${color}; line-height:1;">${it.value}</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:${big?22:19}px; font-weight:700; color:${color}; text-transform:uppercase; margin-top:8px;">${it.cat.label}</div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5; margin-top:16px;">${it.kec.name}</div>
+          <div style="font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; margin-top:2px;">Ibukota: ${it.kec.ibukota}</div>
+        </div>`;
+    }
+
+    const rowsHTML = sorted.map((it, i)=>{
+      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+      const value = it.value != null ? it.value : '—';
+      const label = it.cat ? it.cat.label : 'Data tidak tersedia';
+      const dominant = it.ispu ? ISPU_PARAM_LABEL[it.ispu.param] : '—';
+      return `
+        <div style="display:flex; align-items:center; gap:18px; padding:16px 20px; background:${i%2===0 ? '#121B2E' : 'transparent'}; border-radius:12px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:#8B96AB; width:28px;">${i+1}</div>
+          <div style="width:12px; height:12px; border-radius:50%; background:${color}; flex-shrink:0;"></div>
+          <div style="flex:1; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5;">${it.kec.name}</div>
+          <div style="font-family:'Inter',sans-serif; font-size:14px; color:#8B96AB; width:110px;">Dominan: ${dominant}</div>
+          <div style="font-family:'Inter',sans-serif; font-size:16px; font-weight:600; color:${color}; width:170px; text-transform:uppercase;">${label}</div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:${color}; width:80px; text-align:right;">${value}</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="width:1080px; background:linear-gradient(180deg, #0B1220, #0d1730); padding:56px; font-family:'Inter',sans-serif; color:#E8EDF5;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <div style="width:14px; height:14px; border-radius:50%; background:#5EEAD4; box-shadow:0 0 14px #5EEAD4;"></div>
+          <div style="font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;">Udaraku</div>
+        </div>
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:40px; font-weight:700; margin-top:14px; line-height:1.25;">Kualitas Udara<br>Kabupaten Indragiri Hulu</div>
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:16px; color:#8B96AB; margin-top:10px;">${tanggal} WIB &middot; Indeks ISPU (Permen LHK No. P.14/2020)</div>
+
+        <div style="display:flex; gap:16px; margin-top:36px;">
+          ${headlineCard(worst, true)}
+          ${headlineCard(median, false)}
+          ${headlineCard(safest, false)}
+        </div>
+
+        <div style="margin-top:36px;">${pillsHTML}</div>
+
+        <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Peringkat 14 Kecamatan</div>
+        <div style="display:flex; flex-direction:column; gap:2px;">${rowsHTML}</div>
+
+        <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
+          Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
+          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku.
+        </div>
+      </div>`;
+  }
+
+  async function generateInfographic(){
+    els.infographicBtn.disabled = true;
+    els.infographicBtnText.textContent = '⏳ Mengambil data 14 kecamatan…';
+    els.infographicHint.textContent = '';
+    try{
+      const items = await fetchAllKecamatan();
+      els.infographicBtnText.textContent = '⏳ Menyusun gambar…';
+      els.infographicTemplate.innerHTML = buildInfographicHTML(items);
+
+      await loadHtml2Canvas();
+      // beri waktu font & layout settle sebelum ditangkap
+      await new Promise(r => setTimeout(r, 150));
+
+      const canvas = await window.html2canvas(els.infographicTemplate.firstElementChild, {
+        backgroundColor: '#0B1220',
+        scale: 2,
+        useCORS: true,
+      });
+
+      canvas.toBlob(blob=>{
+        if(!blob){
+          els.infographicHint.textContent = 'Gagal membuat gambar. Coba lagi.';
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0,10);
+        a.href = url;
+        a.download = `infografis-kualitas-udara-inhu-${stamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(()=> URL.revokeObjectURL(url), 4000);
+        els.infographicHint.textContent = 'Infografis berhasil diunduh.';
+      }, 'image/png');
+    }catch(err){
+      els.infographicHint.textContent = 'Gagal menyusun infografis: ' + err.message;
+    }finally{
+      els.infographicBtn.disabled = false;
+      els.infographicBtnText.textContent = '📊 Unduh Infografis Kabupaten';
+      els.infographicTemplate.innerHTML = '';
+    }
+  }
+  els.infographicBtn.addEventListener('click', generateInfographic);
 
   // ---------------- Particle field (signature element) ----------------
   const canvas = document.getElementById('particleCanvas');
