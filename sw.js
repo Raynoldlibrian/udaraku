@@ -1,4 +1,4 @@
-const CACHE = 'udaraku-shell-v4';
+const CACHE = 'udaraku-shell-v7';
 const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -17,6 +17,7 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   // Never cache the live air-quality/geocoding API calls — always go to network.
   if (url.hostname.includes('open-meteo.com')) return;
+  if (url.hostname.includes('nominatim.openstreetmap.org')) return;
 
   // App shell: cache-first, falling back to network.
   e.respondWith(

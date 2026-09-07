@@ -59,6 +59,15 @@
     transition:border-color .2s; -webkit-appearance:none;
   }
   .searchbar input:focus{ border-color:var(--accent); }
+  .searchbar select{
+    flex:1 1 100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
+    padding:14px 16px; border-radius:12px; font-family:'Inter',sans-serif; font-size:15px; outline:none;
+    transition:border-color .2s; -webkit-appearance:none; appearance:none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 22px) calc(1.15em), calc(100% - 16px) calc(1.15em);
+    background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
+  }
+  .searchbar select:focus{ border-color:var(--accent); }
   .searchbar .btnrow{ display:flex; gap:8px; width:100%; }
   .searchbar button{
     flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
@@ -145,10 +154,18 @@
 <body>
 <div id="app">
 
-  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><br><span>pemantau kualitas udara langsung</span></div>
+  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><span>pemantau kualitas udara langsung</span></div>
 
+  <div class="section-label" style="margin-top:0;">Pilih kecamatan (Indragiri Hulu)</div>
+  <div class="searchbar" style="margin-bottom:14px;">
+    <select id="kecamatanSelect">
+      <option value="">— Pilih kecamatan —</option>
+    </select>
+  </div>
+
+  <div class="section-label">Atau cari lokasi lain</div>
   <div class="searchbar">
-    <input id="cityInput" type="text" placeholder="Cari kota, mis. Lirik, Pematang Reba, Peranap…" autocomplete="off" inputmode="search" enterkeyhint="search">
+    <input id="cityInput" type="text" placeholder="Nama kota, atau tempel koordinat dari Google Maps (mis. -0.4167, 102.5667)…" autocomplete="off" inputmode="search" enterkeyhint="search">
     <div class="btnrow">
       <button id="searchBtn">Cari</button>
       <button id="geoBtn">📍 Lokasi saya</button>
@@ -185,7 +202,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.<br> Raynold -  2026</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
 
 <script>
@@ -210,7 +227,32 @@
     dominantParam: document.getElementById('dominantParam'),
     scaleBar: document.getElementById('scaleBar'),
     scaleLabels: document.getElementById('scaleLabels'),
+    kecamatanSelect: document.getElementById('kecamatanSelect'),
   };
+
+  // ---------------- Data 14 kecamatan Kabupaten Indragiri Hulu, Riau ----------------
+  // Titik koordinat = ibukota kecamatan (pusat pemerintahan), bukan centroid wilayah.
+  // verified:true  → koordinat dicek silang dari sumber (Wikipedia/BPS/latlong.net).
+  // verified:false → estimasi terbaik (kecamatan tetangga/kecamatan induk), SEBAIKNYA
+  //                  diverifikasi manual: cari titik ibukota di Google Maps, klik kanan
+  //                  pada titik itu untuk menyalin koordinatnya, lalu tempel di kolom
+  //                  pencarian "Atau cari lokasi lain" untuk mengecek & mengoreksi di sini.
+  const KECAMATAN_INHU = [
+    { name:'Rengat',         ibukota:'Rengat',            lat:-0.3745648018616207, lon:102.54538123531007, verified:true  },
+    { name:'Rengat Barat',   ibukota:'Pematang Reba',    lat:-0.39485134872313665, lon:102.44858982728763, verified:true },
+    { name:'Seberida',       ibukota:'Pangkalan Kasai',   lat:-0.5929261351763538, lon:102.38909015566851, verified:true  },
+    { name:'Batang Gansal',  ibukota:'Seberida',          lat:-0.7294277671263719, lon:102.51016812296822, verified:true },
+    { name:'Batang Cenaku',  ibukota:'Aur Cina',          lat:-0.6633398294458318, lon:102.27866910268375, verified:true  },
+    { name:'Kelayang',       ibukota:'Simpang Kelayang',  lat:-0.46205048735462395, lon:102.12443260930557, verified:true  },
+    { name:'Rakit Kulim',    ibukota:'Petonggan',         lat:-0.512502989312871, lon:102.19082840930581, verified:true },
+    { name:'Pasir Penyu',    ibukota:'Air Molek',         lat:-0.3515123371536203, lon:102.29772907000459, verified:true },
+    { name:'Lirik',          ibukota:'Lirik',             lat:-0.31207568218042336, lon:102.30951387528113, verified:true },
+    { name:'Sungai Lala',    ibukota:'Kelawat',           lat:-0.38995088502673775, lon:102.22150138232193, verified:true },
+    { name:'Lubuk Batu Jaya',ibukota:'Lubuk Batu Tinggal',lat:-0.3670745131557914, lon:102.14826743814123, verified:true },
+    { name:'Peranap',        ibukota:'Peranap',           lat:-0.520269740547885, lon:101.97134519862495, verified:true  },
+    { name:'Batang Peranap', ibukota:'Selunak',           lat:-0.5530991551516362, lon:101.92258726962577, verified:true },
+    { name:'Kuala Cenaku',   ibukota:'Kuala Cenaku',      lat:-0.4487928014221024, lon:102.67058591729624, verified:true },
+  ];
 
   let currentMode = 'ispu'; // 'ispu' | 'aqi'
   let lastData = null;
@@ -516,19 +558,64 @@
 
   async function searchCity(name){
     if(!name.trim()) return;
+
+    // Deteksi format koordinat hasil paste dari Google Maps, mis. "-0.4167, 102.5667"
+    const coordMatch = name.trim().match(/^(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
+    if(coordMatch){
+      const lat = parseFloat(coordMatch[1]), lon = parseFloat(coordMatch[2]);
+      if(Math.abs(lat) > 90 || Math.abs(lon) > 180){
+        els.hint.textContent = 'Format koordinat tidak valid. Gunakan format "lintang, bujur", mis. -0.4167, 102.5667.';
+        return;
+      }
+      els.hint.textContent = `Menampilkan data untuk koordinat ${lat}, ${lon}…`;
+      els.kecamatanSelect.value = '';
+      let label = `Koordinat ${lat}, ${lon}`;
+      try{
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&accept-language=id`);
+        if(res.ok){
+          const data = await res.json();
+          const a = data.address || {};
+          const parts = [a.village || a.town || a.suburb || a.city_district || a.municipality, a.county || a.city, a.state].filter(Boolean);
+          if(parts.length) label = parts.join(', ');
+        }
+      }catch(err){ /* reverse geocoding gagal — pakai label koordinat mentah */ }
+      els.hint.textContent = `Menampilkan data untuk ${label}.`;
+      fetchAirQuality(lat, lon, label);
+      return;
+    }
+
     els.hint.textContent = `Mencari "${name}"…`;
     try{
       const loc = await geocode(name);
+      els.kecamatanSelect.value = '';
       els.hint.textContent = `Menampilkan data untuk ${loc.label}.`;
       fetchAirQuality(loc.lat, loc.lon, loc.label);
     }catch(err){
-      els.hint.textContent = err.message + '. Coba nama kota lain.';
+      els.hint.textContent = err.message + '. Coba nama kota lain, atau tempel koordinat dari Google Maps.';
     }
   }
+
+  // ---------------- Dropdown kecamatan Indragiri Hulu ----------------
+  KECAMATAN_INHU.forEach((k, i)=>{
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = k.name + (k.verified ? '' : ' *');
+    els.kecamatanSelect.appendChild(opt);
+  });
+  els.kecamatanSelect.addEventListener('change', ()=>{
+    const idx = els.kecamatanSelect.value;
+    if(idx === '') return;
+    const k = KECAMATAN_INHU[idx];
+    els.input.value = '';
+    const note = k.verified ? '' : ' (koordinat estimasi, belum terverifikasi — lihat catatan di kode)';
+    els.hint.textContent = `Menampilkan data untuk ${k.name} (ibukota: ${k.ibukota}), Indragiri Hulu.${note}`;
+    fetchAirQuality(k.lat, k.lon, `${k.name}, Indragiri Hulu`);
+  });
 
   function useMyLocation(){
     if(!navigator.geolocation){ els.hint.textContent = 'Geolokasi tidak didukung di perangkat ini.'; return; }
     els.hint.textContent = 'Mengambil lokasi Anda…';
+    els.kecamatanSelect.value = '';
     navigator.geolocation.getCurrentPosition(pos=>{
       const {latitude, longitude} = pos.coords;
       els.hint.textContent = 'Menampilkan data untuk lokasi Anda saat ini.';
