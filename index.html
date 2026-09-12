@@ -174,7 +174,10 @@
   </div>
 
   <button id="infographicBtn" type="button" class="infobtn">
-    <span id="infographicBtnText">📊 Unduh Infografis Kabupaten (PDF)</span>
+    <span id="infographicBtnText">📊 Unduh Infografis (PNG)</span>
+  </button>
+  <button id="mapBtn" type="button" class="infobtn" style="margin-top:8px;">
+    <span id="mapBtnText">🗺️ Unduh Peta Sebaran (PNG)</span>
   </button>
   <div class="hint" id="infographicHint"></div>
 
@@ -249,6 +252,8 @@
     infographicBtn: document.getElementById('infographicBtn'),
     infographicBtnText: document.getElementById('infographicBtnText'),
     infographicHint: document.getElementById('infographicHint'),
+    mapBtn: document.getElementById('mapBtn'),
+    mapBtnText: document.getElementById('mapBtnText'),
     infographicTemplate: document.getElementById('infographicTemplate'),
   };
 
@@ -453,15 +458,31 @@
       </div>`;
   }
 
+  async function downloadCanvasAsPNG(canvas, filenamePrefix){
+    return new Promise(resolve=>{
+      canvas.toBlob(blob=>{
+        if(!blob){ resolve(false); return; }
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const stamp = new Date().toISOString().slice(0,10);
+        a.href = url;
+        a.download = `${filenamePrefix}-${stamp}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(()=> URL.revokeObjectURL(url), 4000);
+        resolve(true);
+      }, 'image/png');
+    });
+  }
+
   async function generateInfographic(){
     els.infographicBtn.disabled = true;
     els.infographicBtnText.textContent = '⏳ Mengambil data 14 kecamatan…';
     els.infographicHint.textContent = '';
     try{
       const items = await fetchAllKecamatan();
-
-      // Halaman 1: ringkasan (HTML → gambar via html2canvas)
-      els.infographicBtnText.textContent = '⏳ Menyusun halaman 1 (ringkasan)…';
+      els.infographicBtnText.textContent = '⏳ Menyusun gambar…';
       els.infographicTemplate.innerHTML = buildInfographicHTML(items);
       await loadHtml2Canvas();
       await document.fonts.ready;
@@ -471,68 +492,76 @@
         scale: 2,
         useCORS: true,
       });
-
-      // Halaman 2: peta sebaran (digambar langsung di <canvas>, tanpa tile/basemap online —
-      // supaya tidak bergantung koneksi & tidak berisiko soal CORS/lisensi tile map).
-      els.infographicBtnText.textContent = '⏳ Menyusun halaman 2 (peta)…';
-      const canvas2 = await buildMapCanvas(items);
-
-      // Gabungkan jadi satu PDF, 2 halaman.
-      els.infographicBtnText.textContent = '⏳ Menyusun PDF…';
-      await loadJsPDF();
-      const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ unit:'px', format:[canvas1.width, canvas1.height], hotfixes:['px_scaling'] });
-      pdf.addImage(canvas1.toDataURL('image/png'), 'PNG', 0, 0, canvas1.width, canvas1.height);
-      pdf.addPage([canvas2.width, canvas2.height]);
-      pdf.addImage(canvas2.toDataURL('image/png'), 'PNG', 0, 0, canvas2.width, canvas2.height);
-
-      const stamp = new Date().toISOString().slice(0,10);
-      pdf.save(`infografis-kualitas-udara-inhu-${stamp}.pdf`);
-      els.infographicHint.textContent = 'Infografis (PDF, 2 halaman: ringkasan + peta) berhasil diunduh.';
+      const ok = await downloadCanvasAsPNG(canvas1, 'infografis-kualitas-udara-inhu');
+      els.infographicHint.textContent = ok ? 'Infografis berhasil diunduh.' : 'Gagal membuat gambar.';
     }catch(err){
       els.infographicHint.textContent = 'Gagal menyusun infografis: ' + err.message;
     }finally{
       els.infographicBtn.disabled = false;
-      els.infographicBtnText.textContent = '📊 Unduh Infografis Kabupaten (PDF)';
+      els.infographicBtnText.textContent = '📊 Unduh Infografis (PNG)';
       els.infographicTemplate.innerHTML = '';
     }
   }
   els.infographicBtn.addEventListener('click', generateInfographic);
 
-  // ---------------- Halaman 2 infografis: peta sebaran ISPU ----------------
-  // PENTING soal lisensi: peta di bawah ini TIDAK memuat/fetch data batas kecamatan (GADM) sama
-  // sekali di aplikasi. Latar peta adalah GAMBAR STATIS (peta-dasar-inhu.png) yang sudah di-render
-  // satu kali secara terpisah (offline) dari data GADM yang disederhanakan jauh, lalu di-flatten
-  // jadi raster — bukan data vektor yang bisa diekstrak ulang. Titik & warna tiap kecamatan di atas
-  // gambar ini memakai koordinat ibukota kecamatan yang sudah diverifikasi manual (bukan dari GADM),
-  // digabung dengan data ISPU live.
-  const BASEMAP_BBOX = { minLon:101.777, maxLon:102.7201, minLat:-1.09, maxLat:0.1054 };
-  const BASEMAP_SRC = 'peta-dasar-inhu.png';
+  async function generateMapPNG(){
+    els.mapBtn.disabled = true;
+    els.mapBtnText.textContent = '⏳ Mengambil data 14 kecamatan…';
+    els.infographicHint.textContent = '';
+    try{
+      const items = await fetchAllKecamatan();
+      els.mapBtnText.textContent = '⏳ Menyusun peta…';
+      const canvas2 = await buildMapCanvas(items);
+      const ok = await downloadCanvasAsPNG(canvas2, 'peta-sebaran-ispu-inhu');
+      els.infographicHint.textContent = ok ? 'Peta sebaran berhasil diunduh.' : 'Gagal membuat gambar.';
+    }catch(err){
+      els.infographicHint.textContent = 'Gagal menyusun peta: ' + err.message;
+    }finally{
+      els.mapBtn.disabled = false;
+      els.mapBtnText.textContent = '🗺️ Unduh Peta Sebaran (PNG)';
+    }
+  }
+  els.mapBtn.addEventListener('click', generateMapPNG);
 
-  let basemapImagePromise = null;
-  function loadBasemapImage(){
-    if(basemapImagePromise) return basemapImagePromise;
-    basemapImagePromise = new Promise((resolve, reject)=>{
+  // ---------------- Peta sebaran ISPU (choropleth, tanpa data GADM di aplikasi) ----------------
+  // PENTING soal lisensi: peta ini TIDAK memuat/menyimpan data geometri (bentuk) kecamatan sama
+  // sekali. Yang dipakai cuma 2 GAMBAR RASTER statis, dirender satu kali secara terpisah (offline):
+  //  1) peta-mask-inhu.png  — tiap kecamatan diberi warna abu-abu solid ID unik (arbitrer, buatan
+  //     sendiri, BUKAN data geografis). Aplikasi cuma mencocokkan warna ID ini lalu MENGGANTINYA
+  //     jadi warna status ISPU secara piksel-per-piksel (seperti "cat sesuai nomor").
+  //  2) peta-garis-inhu.png — overlay garis batas saja (transparan), ditumpuk di atas untuk
+  //     mempertegas batas antar wilayah.
+  // Karena keduanya raster hasil flatten (bukan koordinat/vektor), tidak ada data yang bisa
+  // diekstrak ulang jadi bentuk geometri presisi seperti file GeoJSON/SHP aslinya.
+  const MASK_SRC = 'peta-mask-inhu.png';
+  const BORDER_SRC = 'peta-garis-inhu.png';
+
+  // Kode warna ID (grayscale) per kecamatan — angka arbitrer buatan sendiri saat generate gambar mask.
+  const MASK_ID_GRAY = {
+    'Batang Cenaku':10, 'Batang Gansal':26, 'Batang Peranap':42, 'Kelayang':58,
+    'Kuala Cenaku':74, 'Lirik':90, 'Lubuk Batu Jaya':106, 'Pasir Penyu':122,
+    'Peranap':138, 'Rakit Kulim':154, 'Rengat':170, 'Rengat Barat':186,
+    'Seberida':202, 'Sungai Lala':218,
+  };
+  // Bounding box lon/lat yang dipakai saat render gambar mask/garis — dipakai lagi di sini
+  // hanya untuk menaruh label nama+nilai di titik ibukota kecamatan (koordinat terverifikasi).
+  const MAP_BBOX = { minLon:101.777, maxLon:102.7201, minLat:-1.09, maxLat:0.1054 };
+
+  const imageLoadCache = {};
+  function loadImageAsset(src){
+    if(imageLoadCache[src]) return imageLoadCache[src];
+    imageLoadCache[src] = new Promise((resolve, reject)=>{
       const img = new Image();
       img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Gagal memuat gambar peta dasar.'));
-      img.src = BASEMAP_SRC;
+      img.onerror = () => reject(new Error('Gagal memuat gambar: ' + src));
+      img.src = src;
     });
-    return basemapImagePromise;
+    return imageLoadCache[src];
   }
 
-  let jsPDFLoadPromise = null;
-  function loadJsPDF(){
-    if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
-    if(jsPDFLoadPromise) return jsPDFLoadPromise;
-    jsPDFLoadPromise = new Promise((resolve, reject)=>{
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('Gagal memuat pustaka PDF.'));
-      document.head.appendChild(s);
-    });
-    return jsPDFLoadPromise;
+  function hexToRgb(hex){
+    const num = parseInt(hex.replace('#',''), 16);
+    return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
   }
 
   function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
@@ -553,15 +582,36 @@
   }
 
   async function buildMapCanvas(items){
-    const basemap = await loadBasemapImage();
+    const [maskImg, borderImg] = await Promise.all([loadImageAsset(MASK_SRC), loadImageAsset(BORDER_SRC)]);
+    const byName = {};
+    items.forEach(it => { byName[it.kec.name] = it; });
 
-    const PAD = 120;
-    const HEADER_H = 300;
-    const LEGEND_H = 90;
-    const FOOTER_H = 150;
-    const W = 2160;
+    // --- Ganti warna ID pada mask jadi warna status ISPU, piksel per piksel ---
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = maskImg.width; maskCanvas.height = maskImg.height;
+    const maskCtx = maskCanvas.getContext('2d');
+    maskCtx.drawImage(maskImg, 0, 0);
+    const imgData = maskCtx.getImageData(0, 0, maskImg.width, maskImg.height);
+    const d = imgData.data;
+
+    const colorLUT = new Array(256).fill(null);
+    Object.entries(MASK_ID_GRAY).forEach(([name, gray])=>{
+      const it = byName[name];
+      const color = it && it.cat ? displayColor(it.cat) : '#8B96AB';
+      colorLUT[gray] = hexToRgb(color);
+    });
+
+    for(let i=0; i<d.length; i+=4){
+      const rgb = colorLUT[d[i]]; // r===g===b pada gambar mask (grayscale)
+      if(rgb){ d[i]=rgb.r; d[i+1]=rgb.g; d[i+2]=rgb.b; d[i+3]=255; }
+      else { d[i+3]=0; } // luar wilayah / tak dikenali → transparan
+    }
+    maskCtx.putImageData(imgData, 0, 0);
+
+    // --- Susun kanvas infografis (header, peta berwarna, legend, footer) ---
+    const PAD = 120, HEADER_H = 300, LEGEND_H = 90, FOOTER_H = 150, W = 2160;
     const mapW = W - PAD*2;
-    const mapH = mapW * (basemap.height / basemap.width);
+    const mapH = mapW * (maskImg.height / maskImg.width);
     const totalH = Math.round(HEADER_H + mapH + LEGEND_H + FOOTER_H + PAD);
 
     const canvas = document.createElement('canvas');
@@ -572,7 +622,6 @@
     grad.addColorStop(0,'#0B1220'); grad.addColorStop(1,'#0d1730');
     ctx.fillStyle = grad; ctx.fillRect(0,0,W,totalH);
 
-    // Header
     ctx.fillStyle = '#5EEAD4';
     ctx.beginPath(); ctx.arc(PAD+14, 66, 14, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#E8EDF5';
@@ -582,44 +631,31 @@
     ctx.fillText('Peta Sebaran Status ISPU', PAD, 168);
     ctx.fillText('Kabupaten Indragiri Hulu', PAD, 236);
 
-    // Gambar latar (peta statis)
-    ctx.drawImage(basemap, PAD, HEADER_H, mapW, mapH);
+    // Peta berwarna + garis batas
+    ctx.drawImage(maskCanvas, PAD, HEADER_H, mapW, mapH);
+    ctx.drawImage(borderImg, PAD, HEADER_H, mapW, mapH);
 
-    // Proyeksi titik ibukota kecamatan ke posisi piksel di atas gambar latar,
-    // memakai bounding box yang sama persis dipakai saat gambar latar dirender.
+    // Label nama + nilai ISPU di titik ibukota tiap kecamatan (koordinat terverifikasi).
     function project(lat, lon){
-      const x = PAD + (lon - BASEMAP_BBOX.minLon) / (BASEMAP_BBOX.maxLon - BASEMAP_BBOX.minLon) * mapW;
-      const y = HEADER_H + (BASEMAP_BBOX.maxLat - lat) / (BASEMAP_BBOX.maxLat - BASEMAP_BBOX.minLat) * mapH;
+      const x = PAD + (lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * mapW;
+      const y = HEADER_H + (MAP_BBOX.maxLat - lat) / (MAP_BBOX.maxLat - MAP_BBOX.minLat) * mapH;
       return [x, y];
     }
-
     items.forEach(it=>{
       const [x, y] = project(it.kec.lat, it.kec.lon);
-      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
       const valLabel = it.value != null ? String(it.value) : '—';
-
-      // Titik
-      ctx.beginPath();
-      ctx.arc(x, y, 20, 0, Math.PI*2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#0B1220';
-      ctx.stroke();
-
-      // Label nama + nilai
-      ctx.font = "600 22px 'Inter', sans-serif";
       const label = it.kec.name;
-      const textW = Math.max(ctx.measureText(label).width, 40) + 24;
-      const boxY = y - 78;
-      ctx.fillStyle = 'rgba(11,18,32,0.78)';
-      ctx.fillRect(x-textW/2, boxY, textW, 58);
+
+      ctx.font = "600 20px 'Inter', sans-serif";
+      const textW = Math.max(ctx.measureText(label).width, 40) + 22;
+      const boxY = y - 26;
+      ctx.fillStyle = 'rgba(11,18,32,0.75)';
+      ctx.fillRect(x-textW/2, boxY, textW, 52);
       ctx.fillStyle = '#fff';
       ctx.textAlign = 'center';
-      ctx.fillText(label, x, boxY+24);
-      ctx.font = "700 22px 'IBM Plex Mono', monospace";
-      ctx.fillStyle = color;
-      ctx.fillText(valLabel, x, boxY+48);
+      ctx.fillText(label, x, boxY+22);
+      ctx.font = "700 20px 'IBM Plex Mono', monospace";
+      ctx.fillText(valLabel, x, boxY+44);
       ctx.textAlign = 'left';
     });
 
@@ -641,7 +677,7 @@
     ctx.fillStyle = '#8B96AB';
     const footerY = HEADER_H + mapH + LEGEND_H + 14;
     wrapCanvasText(ctx,
-      'Latar peta: ilustrasi wilayah yang disederhanakan (dirender sebagai gambar statis, bukan data batas administrasi yang dapat diunduh ulang). Titik lokasi = koordinat ibukota kecamatan (diverifikasi manual). Warna & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS).',
+      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual).',
       PAD, footerY, W-PAD*2, 28);
 
     return canvas;

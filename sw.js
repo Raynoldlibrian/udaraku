@@ -1,5 +1,5 @@
-const CACHE = 'udaraku-shell-v12';
-const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './peta-dasar-inhu.png'];
+const CACHE = 'udaraku-shell-v13';
+const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './peta-mask-inhu.png', './peta-garis-inhu.png'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
