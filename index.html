@@ -312,7 +312,7 @@
     {max:100, label:'Sedang',              color:'#3B82F6', advice:'Kualitas udara masih dapat diterima. Kelompok sensitif sebaiknya kurangi aktivitas fisik berat di luar.'},
     {max:200, label:'Tidak Sehat',         color:'#FACC15', advice:'Mulai merugikan kesehatan. Gunakan masker dan kurangi aktivitas di luar ruangan.'},
     {max:300, label:'Sangat Tidak Sehat',  color:'#EF4444', advice:'Risiko kesehatan meningkat untuk semua orang. Disarankan tetap di dalam rumah.'},
-    {max:99999,label:'Berbahaya',          color:'#18181B', glow:'#EF4444', advice:'Kondisi darurat. Semua orang sebaiknya tidak beraktivitas di luar rumah.'},
+    {max:99999,label:'Berbahaya',          color:'#18181B', glow:'#7F1D1D', advice:'Kondisi darurat. Semua orang sebaiknya tidak beraktivitas di luar rumah.'},
   ];
   function ispuCategoryFor(v){ return ISPU_CATEGORIES.find(c => v <= c.max) || ISPU_CATEGORIES[ISPU_CATEGORIES.length-1]; }
   // Warna asli 'Berbahaya' adalah hitam (sesuai standar resmi) — untuk elemen visual di atas
