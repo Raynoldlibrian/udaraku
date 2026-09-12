@@ -174,7 +174,7 @@
   </div>
 
   <button id="infographicBtn" type="button" class="infobtn">
-    <span id="infographicBtnText">📊 Unduh Infografis Kabupaten</span>
+    <span id="infographicBtnText">📊 Unduh Infografis Kabupaten (PDF)</span>
   </button>
   <div class="hint" id="infographicHint"></div>
 
@@ -217,7 +217,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional. &copy Raynold - 2026</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
 
 <!-- Template infografis (di-render off-screen, ditangkap jadi PNG saat tombol unduh diklik) -->
@@ -448,7 +448,7 @@
 
         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
           Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
-          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. &copy Raynold - 2026
+          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku.
         </div>
       </div>`;
   }
@@ -459,44 +459,193 @@
     els.infographicHint.textContent = '';
     try{
       const items = await fetchAllKecamatan();
-      els.infographicBtnText.textContent = '⏳ Menyusun gambar…';
+
+      // Halaman 1: ringkasan (HTML → gambar via html2canvas)
+      els.infographicBtnText.textContent = '⏳ Menyusun halaman 1 (ringkasan)…';
       els.infographicTemplate.innerHTML = buildInfographicHTML(items);
-
       await loadHtml2Canvas();
-      // beri waktu font & layout settle sebelum ditangkap
-      await new Promise(r => setTimeout(r, 150));
-
-      const canvas = await window.html2canvas(els.infographicTemplate.firstElementChild, {
+      await document.fonts.ready;
+      await new Promise(r => setTimeout(r, 150)); // beri waktu font & layout settle
+      const canvas1 = await window.html2canvas(els.infographicTemplate.firstElementChild, {
         backgroundColor: '#0B1220',
         scale: 2,
         useCORS: true,
       });
 
-      canvas.toBlob(blob=>{
-        if(!blob){
-          els.infographicHint.textContent = 'Gagal membuat gambar. Coba lagi.';
-          return;
-        }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const stamp = new Date().toISOString().slice(0,10);
-        a.href = url;
-        a.download = `infografis-kualitas-udara-inhu-${stamp}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(()=> URL.revokeObjectURL(url), 4000);
-        els.infographicHint.textContent = 'Infografis berhasil diunduh.';
-      }, 'image/png');
+      // Halaman 2: peta sebaran (digambar langsung di <canvas>, tanpa tile/basemap online —
+      // supaya tidak bergantung koneksi & tidak berisiko soal CORS/lisensi tile map).
+      els.infographicBtnText.textContent = '⏳ Menyusun halaman 2 (peta)…';
+      const canvas2 = await buildMapCanvas(items);
+
+      // Gabungkan jadi satu PDF, 2 halaman.
+      els.infographicBtnText.textContent = '⏳ Menyusun PDF…';
+      await loadJsPDF();
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:'px', format:[canvas1.width, canvas1.height], hotfixes:['px_scaling'] });
+      pdf.addImage(canvas1.toDataURL('image/png'), 'PNG', 0, 0, canvas1.width, canvas1.height);
+      pdf.addPage([canvas2.width, canvas2.height]);
+      pdf.addImage(canvas2.toDataURL('image/png'), 'PNG', 0, 0, canvas2.width, canvas2.height);
+
+      const stamp = new Date().toISOString().slice(0,10);
+      pdf.save(`infografis-kualitas-udara-inhu-${stamp}.pdf`);
+      els.infographicHint.textContent = 'Infografis (PDF, 2 halaman: ringkasan + peta) berhasil diunduh.';
     }catch(err){
       els.infographicHint.textContent = 'Gagal menyusun infografis: ' + err.message;
     }finally{
       els.infographicBtn.disabled = false;
-      els.infographicBtnText.textContent = '📊 Unduh Infografis Kabupaten';
+      els.infographicBtnText.textContent = '📊 Unduh Infografis Kabupaten (PDF)';
       els.infographicTemplate.innerHTML = '';
     }
   }
   els.infographicBtn.addEventListener('click', generateInfographic);
+
+  // ---------------- Halaman 2 infografis: peta sebaran ISPU ----------------
+  // PENTING soal lisensi: peta di bawah ini TIDAK memuat/fetch data batas kecamatan (GADM) sama
+  // sekali di aplikasi. Latar peta adalah GAMBAR STATIS (peta-dasar-inhu.png) yang sudah di-render
+  // satu kali secara terpisah (offline) dari data GADM yang disederhanakan jauh, lalu di-flatten
+  // jadi raster — bukan data vektor yang bisa diekstrak ulang. Titik & warna tiap kecamatan di atas
+  // gambar ini memakai koordinat ibukota kecamatan yang sudah diverifikasi manual (bukan dari GADM),
+  // digabung dengan data ISPU live.
+  const BASEMAP_BBOX = { minLon:101.777, maxLon:102.7201, minLat:-1.09, maxLat:0.1054 };
+  const BASEMAP_SRC = 'peta-dasar-inhu.png';
+
+  let basemapImagePromise = null;
+  function loadBasemapImage(){
+    if(basemapImagePromise) return basemapImagePromise;
+    basemapImagePromise = new Promise((resolve, reject)=>{
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Gagal memuat gambar peta dasar.'));
+      img.src = BASEMAP_SRC;
+    });
+    return basemapImagePromise;
+  }
+
+  let jsPDFLoadPromise = null;
+  function loadJsPDF(){
+    if(window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
+    if(jsPDFLoadPromise) return jsPDFLoadPromise;
+    jsPDFLoadPromise = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('Gagal memuat pustaka PDF.'));
+      document.head.appendChild(s);
+    });
+    return jsPDFLoadPromise;
+  }
+
+  function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
+    const words = text.split(' ');
+    let line = '', lineY = y;
+    for(let n=0;n<words.length;n++){
+      const testLine = line + words[n] + ' ';
+      if(ctx.measureText(testLine).width > maxWidth && n>0){
+        ctx.fillText(line, x, lineY);
+        line = words[n] + ' ';
+        lineY += lineHeight;
+      } else {
+        line = testLine;
+      }
+    }
+    ctx.fillText(line, x, lineY);
+    return lineY + lineHeight;
+  }
+
+  async function buildMapCanvas(items){
+    const basemap = await loadBasemapImage();
+
+    const PAD = 120;
+    const HEADER_H = 300;
+    const LEGEND_H = 90;
+    const FOOTER_H = 150;
+    const W = 2160;
+    const mapW = W - PAD*2;
+    const mapH = mapW * (basemap.height / basemap.width);
+    const totalH = Math.round(HEADER_H + mapH + LEGEND_H + FOOTER_H + PAD);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = totalH;
+    const ctx = canvas.getContext('2d');
+
+    const grad = ctx.createLinearGradient(0,0,0,totalH);
+    grad.addColorStop(0,'#0B1220'); grad.addColorStop(1,'#0d1730');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,W,totalH);
+
+    // Header
+    ctx.fillStyle = '#5EEAD4';
+    ctx.beginPath(); ctx.arc(PAD+14, 66, 14, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#E8EDF5';
+    ctx.font = "700 40px 'Space Grotesk', sans-serif";
+    ctx.fillText('Udaraku', PAD+42, 80);
+    ctx.font = "700 62px 'Space Grotesk', sans-serif";
+    ctx.fillText('Peta Sebaran Status ISPU', PAD, 168);
+    ctx.fillText('Kabupaten Indragiri Hulu', PAD, 236);
+
+    // Gambar latar (peta statis)
+    ctx.drawImage(basemap, PAD, HEADER_H, mapW, mapH);
+
+    // Proyeksi titik ibukota kecamatan ke posisi piksel di atas gambar latar,
+    // memakai bounding box yang sama persis dipakai saat gambar latar dirender.
+    function project(lat, lon){
+      const x = PAD + (lon - BASEMAP_BBOX.minLon) / (BASEMAP_BBOX.maxLon - BASEMAP_BBOX.minLon) * mapW;
+      const y = HEADER_H + (BASEMAP_BBOX.maxLat - lat) / (BASEMAP_BBOX.maxLat - BASEMAP_BBOX.minLat) * mapH;
+      return [x, y];
+    }
+
+    items.forEach(it=>{
+      const [x, y] = project(it.kec.lat, it.kec.lon);
+      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+      const valLabel = it.value != null ? String(it.value) : '—';
+
+      // Titik
+      ctx.beginPath();
+      ctx.arc(x, y, 20, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = '#0B1220';
+      ctx.stroke();
+
+      // Label nama + nilai
+      ctx.font = "600 22px 'Inter', sans-serif";
+      const label = it.kec.name;
+      const textW = Math.max(ctx.measureText(label).width, 40) + 24;
+      const boxY = y - 78;
+      ctx.fillStyle = 'rgba(11,18,32,0.78)';
+      ctx.fillRect(x-textW/2, boxY, textW, 58);
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x, boxY+24);
+      ctx.font = "700 22px 'IBM Plex Mono', monospace";
+      ctx.fillStyle = color;
+      ctx.fillText(valLabel, x, boxY+48);
+      ctx.textAlign = 'left';
+    });
+
+    // Legend
+    let legendY = HEADER_H + mapH + 56;
+    let legendX = PAD;
+    ctx.font = "500 24px 'Inter', sans-serif";
+    ISPU_CATEGORIES.forEach(c=>{
+      const color = displayColor(c);
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(legendX+11, legendY, 11, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = '#E8EDF5';
+      ctx.fillText(c.label, legendX+32, legendY+8);
+      legendX += 32 + ctx.measureText(c.label).width + 44;
+    });
+
+    // Footer / disclaimer
+    ctx.font = "400 20px 'Inter', sans-serif";
+    ctx.fillStyle = '#8B96AB';
+    const footerY = HEADER_H + mapH + LEGEND_H + 14;
+    wrapCanvasText(ctx,
+      'Latar peta: ilustrasi wilayah yang disederhanakan (dirender sebagai gambar statis, bukan data batas administrasi yang dapat diunduh ulang). Titik lokasi = koordinat ibukota kecamatan (diverifikasi manual). Warna & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS).',
+      PAD, footerY, W-PAD*2, 28);
+
+    return canvas;
+  }
 
   // ---------------- Particle field (signature element) ----------------
   const canvas = document.getElementById('particleCanvas');
