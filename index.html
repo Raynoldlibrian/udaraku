@@ -220,7 +220,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional. &copy Raynold - 2026</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
 </div>
 
 <!-- Template infografis (di-render off-screen, ditangkap jadi PNG saat tombol unduh diklik) -->
@@ -453,7 +453,7 @@
 
         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
           Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
-          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. &copy Raynold - 2026
+          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku.
         </div>
       </div>`;
   }
@@ -635,28 +635,98 @@
     ctx.drawImage(maskCanvas, PAD, HEADER_H, mapW, mapH);
     ctx.drawImage(borderImg, PAD, HEADER_H, mapW, mapH);
 
-    // Label nama + nilai ISPU di titik ibukota tiap kecamatan (koordinat terverifikasi).
+    // Label nama + nilai ISPU sebagai callout (balon dengan penunjuk) di titik ibukota kecamatan.
     function project(lat, lon){
       const x = PAD + (lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * mapW;
       const y = HEADER_H + (MAP_BBOX.maxLat - lat) / (MAP_BBOX.maxLat - MAP_BBOX.minLat) * mapH;
       return [x, y];
     }
+
+    function drawCallout(ctx, x, y, name, valueLabel, catLabel, color, bounds){
+      const PADX = 26, DOT_R = 12, POINTER_H = 18, GAP = 6, RADIUS = 18;
+      const nameFont = "700 30px 'Space Grotesk', sans-serif";
+      const valueFont = "700 34px 'IBM Plex Mono', monospace";
+      const catFont = "700 19px 'Inter', sans-serif";
+
+      ctx.font = nameFont;
+      const nameW = ctx.measureText(name).width;
+      ctx.font = valueFont;
+      const valueW = ctx.measureText(valueLabel).width;
+      ctx.font = catFont;
+      const catText = catLabel.toUpperCase();
+      const catW = ctx.measureText(catText).width;
+      const row2W = valueW + 12 + catW;
+
+      const boxW = Math.max(nameW, row2W) + PADX*2;
+      const boxH = 118;
+
+      let flipped = false;
+      let boxTopY = y - DOT_R - POINTER_H - boxH;
+      if(boxTopY < bounds.top + 6){ flipped = true; boxTopY = y + DOT_R + POINTER_H; }
+
+      let boxLeftX = x - boxW/2;
+      boxLeftX = Math.max(bounds.left + 4, Math.min(bounds.right - boxW - 4, boxLeftX));
+      const boxCenterX = boxLeftX + boxW/2;
+
+      // Titik lokasi
+      ctx.beginPath(); ctx.arc(x, y, DOT_R, 0, Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.lineWidth = 3.5; ctx.strokeStyle = '#0B1220'; ctx.stroke();
+
+      // Penunjuk (segitiga) dari kotak ke titik
+      ctx.beginPath();
+      if(!flipped){
+        ctx.moveTo(boxCenterX-11, boxTopY+boxH-1);
+        ctx.lineTo(boxCenterX+11, boxTopY+boxH-1);
+        ctx.lineTo(x, y-DOT_R-2);
+      } else {
+        ctx.moveTo(boxCenterX-11, boxTopY+1);
+        ctx.lineTo(boxCenterX+11, boxTopY+1);
+        ctx.lineTo(x, y+DOT_R+2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(13,20,36,0.94)';
+      ctx.fill();
+
+      // Kotak balon (rounded rect)
+      ctx.beginPath();
+      ctx.moveTo(boxLeftX+RADIUS, boxTopY);
+      ctx.arcTo(boxLeftX+boxW, boxTopY, boxLeftX+boxW, boxTopY+boxH, RADIUS);
+      ctx.arcTo(boxLeftX+boxW, boxTopY+boxH, boxLeftX, boxTopY+boxH, RADIUS);
+      ctx.arcTo(boxLeftX, boxTopY+boxH, boxLeftX, boxTopY, RADIUS);
+      ctx.arcTo(boxLeftX, boxTopY, boxLeftX+boxW, boxTopY, RADIUS);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(13,20,36,0.94)';
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = color;
+      ctx.stroke();
+
+      // Teks: nama (baris 1), nilai + kategori (baris 2)
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#F4F7FB';
+      ctx.font = nameFont;
+      ctx.fillText(name, boxCenterX, boxTopY + 44);
+
+      const row2Y = boxTopY + 92;
+      ctx.textAlign = 'left';
+      let curX = boxCenterX - row2W/2;
+      ctx.font = valueFont;
+      ctx.fillStyle = color;
+      ctx.fillText(valueLabel, curX, row2Y);
+      curX += valueW + 12;
+      ctx.font = catFont;
+      ctx.fillText(catText, curX, row2Y - 2);
+      ctx.textAlign = 'left';
+    }
+
+    const calloutBounds = { left: PAD, right: PAD + mapW, top: HEADER_H };
     items.forEach(it=>{
       const [x, y] = project(it.kec.lat, it.kec.lon);
       const valLabel = it.value != null ? String(it.value) : '—';
-      const label = it.kec.name;
-
-      ctx.font = "600 20px 'Inter', sans-serif";
-      const textW = Math.max(ctx.measureText(label).width, 40) + 22;
-      const boxY = y - 26;
-      ctx.fillStyle = 'rgba(11,18,32,0.75)';
-      ctx.fillRect(x-textW/2, boxY, textW, 52);
-      ctx.fillStyle = '#fff';
-      ctx.textAlign = 'center';
-      ctx.fillText(label, x, boxY+22);
-      ctx.font = "700 20px 'IBM Plex Mono', monospace";
-      ctx.fillText(valLabel, x, boxY+44);
-      ctx.textAlign = 'left';
+      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+      const catLabel = it.cat ? it.cat.label : 'Tidak diketahui';
+      drawCallout(ctx, x, y, it.kec.name, valLabel, catLabel, color, calloutBounds);
     });
 
     // Legend
@@ -677,7 +747,7 @@
     ctx.fillStyle = '#8B96AB';
     const footerY = HEADER_H + mapH + LEGEND_H + 14;
     wrapCanvasText(ctx,
-      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
+      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual).',
       PAD, footerY, W-PAD*2, 28);
 
     return canvas;
