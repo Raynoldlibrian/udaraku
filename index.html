@@ -635,98 +635,133 @@
     ctx.drawImage(maskCanvas, PAD, HEADER_H, mapW, mapH);
     ctx.drawImage(borderImg, PAD, HEADER_H, mapW, mapH);
 
-    // Label nama + nilai ISPU sebagai callout (balon dengan penunjuk) di titik ibukota kecamatan.
+    // Label nama + nilai ISPU sebagai callout (balon dengan garis penyambung) di titik ibukota
+    // kecamatan. Posisinya dihitung dulu semua, lalu balon yang bertabrakan digeser otomatis
+    // (biar tidak numpuk saat beberapa kecamatan berdekatan), baru digambar.
     function project(lat, lon){
       const x = PAD + (lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * mapW;
       const y = HEADER_H + (MAP_BBOX.maxLat - lat) / (MAP_BBOX.maxLat - MAP_BBOX.minLat) * mapH;
       return [x, y];
     }
 
-    function drawCallout(ctx, x, y, name, valueLabel, catLabel, color, bounds){
-      const PADX = 26, DOT_R = 12, POINTER_H = 18, GAP = 6, RADIUS = 18;
-      const nameFont = "700 30px 'Space Grotesk', sans-serif";
-      const valueFont = "700 34px 'IBM Plex Mono', monospace";
-      const catFont = "700 19px 'Inter', sans-serif";
+    const NAME_FONT = "700 30px 'Space Grotesk', sans-serif";
+    const VALUE_FONT = "700 34px 'IBM Plex Mono', monospace";
+    const CAT_FONT = "700 19px 'Inter', sans-serif";
+    const CALLOUT_PADX = 26, CALLOUT_H = 118, DOT_R = 12, GAP = 16, RADIUS = 18;
 
-      ctx.font = nameFont;
+    function measureCallout(ctx, name, valueLabel, catLabel){
+      ctx.font = NAME_FONT;
       const nameW = ctx.measureText(name).width;
-      ctx.font = valueFont;
+      ctx.font = VALUE_FONT;
       const valueW = ctx.measureText(valueLabel).width;
-      ctx.font = catFont;
+      ctx.font = CAT_FONT;
       const catText = catLabel.toUpperCase();
       const catW = ctx.measureText(catText).width;
       const row2W = valueW + 12 + catW;
+      return { boxW: Math.max(nameW, row2W) + CALLOUT_PADX*2, valueW, catW, catText, row2W };
+    }
 
-      const boxW = Math.max(nameW, row2W) + PADX*2;
-      const boxH = 118;
+    // --- Tahap 1: hitung posisi awal tiap balon ---
+    const bounds = { left: PAD, right: PAD + mapW, top: HEADER_H, bottom: HEADER_H + mapH };
+    const labels = items.map(it=>{
+      const [x, y] = project(it.kec.lat, it.kec.lon);
+      const valueLabel = it.value != null ? String(it.value) : '—';
+      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+      const catLabel = it.cat ? it.cat.label : 'Tidak diketahui';
+      const m = measureCallout(ctx, it.kec.name, valueLabel, catLabel);
+      const boxH = CALLOUT_H;
 
       let flipped = false;
-      let boxTopY = y - DOT_R - POINTER_H - boxH;
-      if(boxTopY < bounds.top + 6){ flipped = true; boxTopY = y + DOT_R + POINTER_H; }
+      let boxTopY = y - DOT_R - GAP - boxH;
+      if(boxTopY < bounds.top + 6){ flipped = true; boxTopY = y + DOT_R + GAP; }
+      let boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-m.boxW-4, x - m.boxW/2));
 
-      let boxLeftX = x - boxW/2;
-      boxLeftX = Math.max(bounds.left + 4, Math.min(bounds.right - boxW - 4, boxLeftX));
-      const boxCenterX = boxLeftX + boxW/2;
+      return { it, x, y, name: it.kec.name, valueLabel, catLabel: m.catText, color,
+                boxW: m.boxW, boxH, valueW: m.valueW, row2W: m.row2W,
+                boxLeftX, boxTopY, flipped };
+    });
+
+    // --- Tahap 2: selesaikan tabrakan antar balon (dorong saling menjauh, beberapa iterasi) ---
+    const PAD_GAP = 10;
+    for(let iter=0; iter<150; iter++){
+      let moved = false;
+      for(let i=0;i<labels.length;i++){
+        for(let j=i+1;j<labels.length;j++){
+          const a = labels[i], b = labels[j];
+          const ax1=a.boxLeftX-PAD_GAP, ax2=a.boxLeftX+a.boxW+PAD_GAP, ay1=a.boxTopY-PAD_GAP, ay2=a.boxTopY+a.boxH+PAD_GAP;
+          const bx1=b.boxLeftX-PAD_GAP, bx2=b.boxLeftX+b.boxW+PAD_GAP, by1=b.boxTopY-PAD_GAP, by2=b.boxTopY+b.boxH+PAD_GAP;
+          const overlapX = Math.min(ax2,bx2) - Math.max(ax1,bx1);
+          const overlapY = Math.min(ay2,by2) - Math.max(ay1,by1);
+          if(overlapX > 0 && overlapY > 0){
+            moved = true;
+            if(overlapX < overlapY){
+              const shift = overlapX/2 + 1;
+              if(a.boxLeftX < b.boxLeftX){ a.boxLeftX -= shift; b.boxLeftX += shift; }
+              else { a.boxLeftX += shift; b.boxLeftX -= shift; }
+            } else {
+              const shift = overlapY/2 + 1;
+              if(a.boxTopY < b.boxTopY){ a.boxTopY -= shift; b.boxTopY += shift; }
+              else { a.boxTopY += shift; b.boxTopY -= shift; }
+            }
+          }
+        }
+      }
+      labels.forEach(l=>{
+        l.boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-l.boxW-4, l.boxLeftX));
+        l.boxTopY = Math.max(bounds.top+4, Math.min(bounds.bottom-l.boxH-4, l.boxTopY));
+      });
+      if(!moved) break;
+    }
+
+    // --- Tahap 3: gambar garis penyambung, titik lokasi, lalu balonnya ---
+    labels.forEach(L=>{
+      const boxCenterX = L.boxLeftX + L.boxW/2;
+      const edgeY = L.flipped ? L.boxTopY : L.boxTopY + L.boxH;
+      const edgeX = Math.max(L.boxLeftX+18, Math.min(L.boxLeftX+L.boxW-18, L.x));
+
+      // Garis penyambung ke titik lokasi
+      ctx.beginPath();
+      ctx.moveTo(edgeX, edgeY);
+      ctx.lineTo(L.x, L.y);
+      ctx.strokeStyle = L.color;
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
       // Titik lokasi
-      ctx.beginPath(); ctx.arc(x, y, DOT_R, 0, Math.PI*2);
-      ctx.fillStyle = color; ctx.fill();
+      ctx.beginPath(); ctx.arc(L.x, L.y, DOT_R, 0, Math.PI*2);
+      ctx.fillStyle = L.color; ctx.fill();
       ctx.lineWidth = 3.5; ctx.strokeStyle = '#0B1220'; ctx.stroke();
-
-      // Penunjuk (segitiga) dari kotak ke titik
-      ctx.beginPath();
-      if(!flipped){
-        ctx.moveTo(boxCenterX-11, boxTopY+boxH-1);
-        ctx.lineTo(boxCenterX+11, boxTopY+boxH-1);
-        ctx.lineTo(x, y-DOT_R-2);
-      } else {
-        ctx.moveTo(boxCenterX-11, boxTopY+1);
-        ctx.lineTo(boxCenterX+11, boxTopY+1);
-        ctx.lineTo(x, y+DOT_R+2);
-      }
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(13,20,36,0.94)';
-      ctx.fill();
 
       // Kotak balon (rounded rect)
       ctx.beginPath();
-      ctx.moveTo(boxLeftX+RADIUS, boxTopY);
-      ctx.arcTo(boxLeftX+boxW, boxTopY, boxLeftX+boxW, boxTopY+boxH, RADIUS);
-      ctx.arcTo(boxLeftX+boxW, boxTopY+boxH, boxLeftX, boxTopY+boxH, RADIUS);
-      ctx.arcTo(boxLeftX, boxTopY+boxH, boxLeftX, boxTopY, RADIUS);
-      ctx.arcTo(boxLeftX, boxTopY, boxLeftX+boxW, boxTopY, RADIUS);
+      ctx.moveTo(L.boxLeftX+RADIUS, L.boxTopY);
+      ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY+L.boxH, RADIUS);
+      ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY+L.boxH, RADIUS);
+      ctx.arcTo(L.boxLeftX, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY, RADIUS);
+      ctx.arcTo(L.boxLeftX, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY, RADIUS);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(13,20,36,0.94)';
+      ctx.fillStyle = 'rgba(13,20,36,0.96)';
       ctx.fill();
       ctx.lineWidth = 3;
-      ctx.strokeStyle = color;
+      ctx.strokeStyle = L.color;
       ctx.stroke();
 
       // Teks: nama (baris 1), nilai + kategori (baris 2)
       ctx.textAlign = 'center';
       ctx.fillStyle = '#F4F7FB';
-      ctx.font = nameFont;
-      ctx.fillText(name, boxCenterX, boxTopY + 44);
+      ctx.font = NAME_FONT;
+      ctx.fillText(L.name, boxCenterX, L.boxTopY + 44);
 
-      const row2Y = boxTopY + 92;
+      const row2Y = L.boxTopY + 92;
       ctx.textAlign = 'left';
-      let curX = boxCenterX - row2W/2;
-      ctx.font = valueFont;
-      ctx.fillStyle = color;
-      ctx.fillText(valueLabel, curX, row2Y);
-      curX += valueW + 12;
-      ctx.font = catFont;
-      ctx.fillText(catText, curX, row2Y - 2);
+      let curX = boxCenterX - L.row2W/2;
+      ctx.font = VALUE_FONT;
+      ctx.fillStyle = L.color;
+      ctx.fillText(L.valueLabel, curX, row2Y);
+      curX += L.valueW + 12;
+      ctx.font = CAT_FONT;
+      ctx.fillText(L.catLabel, curX, row2Y - 2);
       ctx.textAlign = 'left';
-    }
-
-    const calloutBounds = { left: PAD, right: PAD + mapW, top: HEADER_H };
-    items.forEach(it=>{
-      const [x, y] = project(it.kec.lat, it.kec.lon);
-      const valLabel = it.value != null ? String(it.value) : '—';
-      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
-      const catLabel = it.cat ? it.cat.label : 'Tidak diketahui';
-      drawCallout(ctx, x, y, it.kec.name, valLabel, catLabel, color, calloutBounds);
     });
 
     // Legend
