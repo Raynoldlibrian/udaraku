@@ -220,7 +220,7 @@
     <canvas id="trendCanvas"></canvas>
   </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</footer>
+  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.<br>&copy; Raynold - 2026</footer>
 </div>
 
 <!-- Template infografis (di-render off-screen, ditangkap jadi PNG saat tombol unduh diklik) -->
@@ -453,7 +453,7 @@
 
         <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
           Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
-          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku.
+          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. &copy; Raynold - 2026
         </div>
       </div>`;
   }
@@ -782,7 +782,7 @@
     ctx.fillStyle = '#8B96AB';
     const footerY = HEADER_H + mapH + LEGEND_H + 14;
     wrapCanvasText(ctx,
-      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual).',
+      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
       PAD, footerY, W-PAD*2, 28);
 
     return canvas;
