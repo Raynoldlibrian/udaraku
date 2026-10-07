@@ -192,7 +192,7 @@
     <canvas id="trendChart"></canvas>
 
     <footer>
-        <p>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). PM2.5 &amp; PM10 memakai <b>rata-rata 24 jam</b> sesuai standar.</p>
+        <p>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Perhitungan indeks mengikuti rumus dan ambang batas Permen LHK No. P.14/2020: parameter yang tersedia dihitung dari <b>rata-rata 24 jam</b> dengan pemeriksaan kelengkapan data minimal <b>75%</b>. Hidrokarbon (HC) belum tersedia dari sumber data ini, sehingga hasil aplikasi adalah <b>estimasi berbasis 6/7 parameter</b>, bukan ISPU resmi hasil SPKUA.</p>
         <p>Data berasal dari model atmosfer global beresolusi kasar (puluhan km), bukan sensor di lapangan. Saat kabut asap lokal, nilai model bisa lebih rendah dari kondisi sebenarnya, dan beberapa kecamatan yang berdekatan dapat menampilkan nilai yang sama. Baris "Kondisi saat ini" memakai PM2.5 jam terakhir dan bersifat indikatif, bukan ISPU resmi.</p>
         <p>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</p>
         <p class="credit">© Raynold — 2026</p>
@@ -260,20 +260,25 @@ const AQI_CATEGORIES = [
     { min:301, max:500, label:'Hazardous', color:'#7e0023', advice:'Emergency conditions; everyone should remain indoors.' },
 ];
 
-const ISPU_PARAM_LABEL = { pm2_5:'PM2.5', pm10:'PM10', so2:'SO₂', no2:'NO₂', o3:'O₃', co:'CO' };
+const ISPU_PARAM_LABEL = { pm2_5:'PM2.5', pm10:'PM10', so2:'SO₂', no2:'NO₂', o3:'O₃', co:'CO', hc:'HC' };
 
-/* ===== Ambang batas ISPU — Permen LHK P.14/2020 ===== */
+/* ===== Ambang batas ISPU — Lampiran I Permen LHK No. P.14/2020 =====
+   Semua ambang pada tabel regulasi menggunakan satuan µg/m³ dan basis 24 jam.
+   HC dicantumkan untuk kelengkapan regulasi, tetapi sumber Open-Meteo/CAMS
+   yang dipakai aplikasi tidak menyediakan data HC sehingga tidak dihitung. */
 const BP = {
-    pm2_5:[0,15.5,55.4,150.4,250.4,500],  // µg/m³, rata-rata 24 jam
-    pm10: [0,50,150,350,420,500],         // µg/m³, rata-rata 24 jam
-    so2:  [0,52,180,400,800,1200],        // µg/m³, 1 jam
-    no2:  [0,80,200,1130,2260,3000],      // µg/m³, 1 jam
-    o3:   [0,120,235,400,800,1000],       // µg/m³, 1 jam
-    co:   [0,4,8,15,30,45],               // mg/m³, rata-rata 8 jam
+    pm10: [0,50,150,350,420,500],
+    pm2_5:[0,15.5,55.4,150.4,250.4,500],
+    co:   [0,4000,8000,15000,30000,45000],
+    no2:  [0,80,200,1130,2260,3000],
+    so2:  [0,52,180,400,800,1200],
+    o3:   [0,120,235,400,800,1000],
+    hc:   [0,45,100,215,432,648],
 };
-const MIN_PM_HOURS = 18;   // minimal jam data untuk rata-rata 24 jam
-const MIN_CO_HOURS = 6;    // minimal jam data untuk rata-rata 8 jam
-const AOD_WARN = 0.6;      // ambang indikasi asap/kabut (aerosol optical depth), heuristik — silakan sesuaikan
+const ISPU_PARAMS_AVAILABLE = ['pm10','pm2_5','co','no2','so2','o3'];
+const ISPU_PARAMS_REQUIRED = Object.keys(BP); // 7 parameter menurut P.14/2020
+const MIN_VALID_HOURS = 18; // 75% × 24 jam = minimal 18 data valid
+const AOD_WARN = 0.6;      // heuristik indikasi aerosol/asap; bukan parameter ISPU
 const IDX = [0,50,100,200,300,500];
 
 const $ = id => document.getElementById(id);
@@ -304,19 +309,21 @@ function subIndex(c, a){
 }
 
 function computeISPU(cur, avgs=null){
-    const conc = {
-        pm2_5: avgs?.pm2_5 ?? cur.pm2_5,
-        pm10:  avgs?.pm10  ?? cur.pm10,
-        so2:   cur.sulphur_dioxide, no2: cur.nitrogen_dioxide, o3: cur.ozone,
-        co:    avgs?.co ?? (cur.carbon_monoxide != null ? cur.carbon_monoxide/1000 : null),
-    };
+    /*
+      P.14/2020: indeks dihitung untuk setiap parameter dari konsentrasi
+      hasil pengukuran/olahan 24 jam, lalu diambil nilai ISPU tertinggi.
+      Parameter yang tidak memenuhi kelengkapan 75% tidak dipakai.
+    */
+    const conc = avgs?.concentrations || {};
     let maxIspu=-1, dominantParam=null;
-    for (const k in BP){
-        const s = subIndex(conc[k], BP[k]);
+    for (const k of ISPU_PARAMS_AVAILABLE){
+        const c = conc[k];
+        if (c == null) continue;
+        const s = subIndex(c, BP[k]);
         if (s != null && s > maxIspu){ maxIspu=s; dominantParam=k; }
     }
-    if (dominantParam === null) return { value:null, param:null, conc };   // tidak ada data sama sekali
-    return { value:maxIspu, param:dominantParam, conc };
+    if (dominantParam === null) return { value:null, param:null, conc, valid:avgs?.valid || {} };
+    return { value:maxIspu, param:dominantParam, conc, valid:avgs?.valid || {} };
 }
 
 /* indeks terakhir yang waktunya <= waktu saat ini, +1 (jam berjalan ikut dihitung) */
@@ -325,21 +332,43 @@ function windowEnd(times, currentTime){
     return i < 0 ? times.length : i;
 }
 
-/* Rata-rata: PM2.5 & PM10 = 24 jam, CO = 8 jam (sesuai P.14/2020). Mengembalikan null per parameter bila data kurang. */
-function calcPM24Avg(hourly, currentTime){
+/*
+  P.14/2020 Lampiran I: seluruh parameter menggunakan basis 24 jam.
+  Pasal 7: data valid minimal 75% dipakai untuk penentuan kategori.
+  Dengan data hourly, 75% dari 24 jam = 18 data valid.
+
+  Catatan: untuk data model CAMS, "valid" berarti nilai numerik tersedia.
+  Ini bukan pengganti QA/QC dan validasi lapangan pada SPKUA resmi.
+*/
+function calcISPU24Avg(hourly, currentTime){
     if (!hourly?.time) return null;
     const end = windowEnd(hourly.time, currentTime);
-    const win = (key,n)=>{
-        const a=[]; for (let i=Math.max(0,end-n); i<end; i++){ const v=hourly[key]?.[i]; if (v!=null) a.push(v); }
-        return a;
-    };
+    const start = Math.max(0, end-24);
+    const keys = ['pm10','pm2_5','carbon_monoxide','nitrogen_dioxide','sulphur_dioxide','ozone'];
     const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
-    const p25=win('pm2_5',24), p10=win('pm10',24), co=win('carbon_monoxide',8);
+    const concentrations = {};
+    const valid = {};
+
+    for (const key of keys){
+        const arr = [];
+        for (let i=start; i<end; i++){
+            const v = hourly[key]?.[i];
+            if (v != null && Number.isFinite(Number(v))) arr.push(Number(v));
+        }
+        const param = key==='carbon_monoxide' ? 'co' :
+                      key==='nitrogen_dioxide' ? 'no2' :
+                      key==='sulphur_dioxide' ? 'so2' :
+                      key==='ozone' ? 'o3' : key;
+        valid[param] = arr.length;
+        concentrations[param] = arr.length >= MIN_VALID_HOURS ? avg(arr) : null;
+    }
+
     return {
-        pm2_5: p25.length>=MIN_PM_HOURS ? avg(p25) : null,
-        pm10:  p10.length>=MIN_PM_HOURS ? avg(p10) : null,
-        co:    co.length>=MIN_CO_HOURS  ? avg(co)/1000 : null,   // µg/m³ → mg/m³
-        hours_used:p25.length, co_hours:co.length,
+        concentrations,
+        valid,
+        window_hours: Math.min(24, Math.max(0, end-start)),
+        complete: ISPU_PARAMS_AVAILABLE.every(k => valid[k] >= MIN_VALID_HOURS),
+        hc_available: false,
     };
 }
 
@@ -382,7 +411,7 @@ for (let i=0;i<40;i++){
 async function fetchAir(lat,lon){
     const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}`+
         `&current=us_aqi,pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,aerosol_optical_depth`+
-        `&hourly=pm2_5,pm10,carbon_monoxide&past_days=1&forecast_days=1&timezone=auto`;
+        `&hourly=pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&past_days=1&forecast_days=1&timezone=auto`;
     const r=await fetch(url); if(!r.ok) throw 0; return r.json();
 }
 
@@ -397,7 +426,7 @@ async function loadLocation(lat,lon,label){
     try{
         const d=await fetchAir(lat,lon);
         state.data=d;
-        state.hourlyAvg=calcPM24Avg(d.hourly,d.current.time);
+        state.hourlyAvg=calcISPU24Avg(d.hourly,d.current.time);
         const times=d.hourly.time; const idx=windowEnd(times,d.current.time);
         const st=Math.max(0,idx-24);
         state.trend=times.slice(st,idx).map((t,i)=>({t,v:d.hourly.pm2_5[st+i]}));
@@ -418,15 +447,15 @@ function render(){
     // rincian polutan (selalu diisi, walau indeks tidak bisa dihitung)
     $('v_pm25').textContent=f(conc.pm2_5); $('v_pm10').textContent=f(conc.pm10);
     $('v_o3').textContent=f(conc.o3);      $('v_no2').textContent=f(conc.no2);
-    $('v_so2').textContent=f(conc.so2);    $('v_co').textContent=f(conc.co,2);
+    $('v_so2').textContent=f(conc.so2);    $('v_co').textContent=f(conc.co,0);
 
     const shown = isIspu ? ispu : (d.current.us_aqi ?? null);
     $('dominant').parentElement.style.display = isIspu ? '' : 'none';   // parameter dominan hanya relevan untuk ISPU
     if (shown == null){
         document.documentElement.style.setProperty('--ispu-color', '#8B96AB');
         $('ispuValue').textContent='--';
-        $('ispuStatus').textContent='DATA TIDAK TERSEDIA';
-        $('ispuCaption').textContent='Model belum mengembalikan data untuk lokasi ini. Coba lagi beberapa saat.';
+        $('ispuStatus').textContent='DATA 24 JAM BELUM MEMENUHI';
+        $('ispuCaption').textContent='Belum ada parameter yang memenuhi minimal 75% data valid dalam jendela 24 jam. Indeks tidak dihitung dari nilai sesaat.';
         $('nowLine').style.display='none'; $('smokeBanner').style.display='none';
         $('scaleMarker').style.left='0%';
         return;
@@ -437,9 +466,13 @@ function render(){
     $('ispuStatus').textContent = cat.label.toUpperCase();
     $('ispuCaption').textContent = cat.advice;
     $('dominant').textContent = ISPU_PARAM_LABEL[dom] || dom || '—';
+    if (isIspu) {
+        const validText = Object.entries(state.hourlyAvg?.valid || {}).map(([k,v])=>`${ISPU_PARAM_LABEL[k]||k}: ${v}/24`).join(' · ');
+        $('ispuCaption').textContent = `${cat.advice} Estimasi 6/7 parameter (HC tidak tersedia). Data valid: ${validText}.`;
+    }
     const tz = tzLabel(d.utc_offset_seconds);
     $('timestamp').textContent = 'Diperbarui: ' + (d.current.time||'').replace('T',' ') + (tz?' '+tz:'')
-        + (state.hourlyAvg?.pm2_5!=null ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5.toFixed(1)} µg/m³ (${state.hourlyAvg.hours_used}j)` : ' • rata-rata 24 jam belum lengkap, memakai nilai sesaat');
+        + (state.hourlyAvg?.concentrations?.pm2_5!=null ? ` • PM²·⁵ avg 24j: ${state.hourlyAvg.concentrations.pm2_5.toFixed(1)} µg/m³ (${state.hourlyAvg.valid.pm2_5}/24 data)` : ' • data 24 jam PM²·⁵ belum memenuhi 75%');
     $('scaleMarker').style.left = Math.min(100, shown/5) + '%';
 
     // kondisi saat ini (indikatif): PM2.5 sesaat, bukan ISPU resmi
@@ -550,7 +583,7 @@ async function fetchAllKecamatan(){
     // + hourly=pm2_5,pm10 & past_days=1 → biar bisa hitung rata-rata 24 jam (sama seperti layar utama)
     const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}` +
         `&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone` +
-        `&hourly=pm2_5,pm10,carbon_monoxide&past_days=1&forecast_days=1&timezone=auto`;
+        `&hourly=pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&past_days=1&forecast_days=1&timezone=auto`;
     const res = await fetch(url);
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
@@ -558,7 +591,7 @@ async function fetchAllKecamatan(){
     return KECAMATAN_INHU.map((k,i)=>{
         const r   = results[i];
         const cur = r && r.current;
-        const avg = (r && cur) ? calcPM24Avg(r.hourly, cur.time) : null;  // ← rata-rata 24 jam per kecamatan
+        const avg = (r && cur) ? calcISPU24Avg(r.hourly, cur.time) : null;  // ← rata-rata 24 jam per kecamatan
         const ispu = cur ? computeISPU(cur, avg) : null;                  // ← metode sama dengan layar utama
         const value = ispu ? ispu.value : null;
         const cat = value != null ? ispuCategoryFor(value) : null;
@@ -647,7 +680,7 @@ function buildInfographicHTML(items){
             <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Peringkat 14 Kecamatan</div>
             <div style="display:flex; flex-direction:column; gap:2px;">${rowsHTML}</div>
             <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
-                Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
+                Konsentrasi polutan dari Open-Meteo (model CAMS). Perhitungan mengikuti rumus dan ambang batas Permen LHK No. P.14/2020, menggunakan data valid minimal 75% dari jendela 24 jam untuk parameter yang tersedia. HC belum tersedia dari sumber ini, sehingga hasil adalah estimasi 6/7 parameter. Titik koordinat = ibukota kecamatan.<br>
                 Estimasi model, bukan pengukuran stasiun; bukan pengganti data resmi ISPU KLHK dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. <br>
                 &copy; Raynold - 2026
             </div>
