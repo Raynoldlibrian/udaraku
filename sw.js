@@ -1,4 +1,4 @@
-const CACHE = 'udaraku-shell-v17';
+const CACHE = 'udaraku-shell-v18';
 const SHELL = ['./index.html', './manifest.json', './icon-192.png', './icon-512.png', './peta-mask-inhu.png', './peta-garis-inhu.png'];
 
 self.addEventListener('install', (e) => {
