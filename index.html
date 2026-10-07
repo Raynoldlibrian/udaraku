@@ -480,14 +480,19 @@ function loadHtml2Canvas(){
 async function fetchAllKecamatan(){
     const lats = KECAMATAN_INHU.map(k=>k.lat).join(',');
     const lons = KECAMATAN_INHU.map(k=>k.lon).join(',');
-    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
+    // + hourly=pm2_5,pm10 & past_days=1 → biar bisa hitung rata-rata 24 jam (sama seperti layar utama)
+    const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}` +
+        `&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone` +
+        `&hourly=pm2_5,pm10&past_days=1&forecast_days=1&timezone=auto`;
     const res = await fetch(url);
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
     const results = Array.isArray(data) ? data : [data];
     return KECAMATAN_INHU.map((k,i)=>{
-        const cur = results[i] && results[i].current;
-        const ispu = cur ? computeISPU(cur) : null;
+        const r   = results[i];
+        const cur = r && r.current;
+        const avg = (r && cur) ? calcPM24Avg(r.hourly, cur.time) : null;  // ← rata-rata 24 jam per kecamatan
+        const ispu = cur ? computeISPU(cur, avg) : null;                  // ← metode sama dengan layar utama
         const value = ispu ? ispu.value : null;
         const cat = value != null ? ispuCategoryFor(value) : null;
         return { kec:k, ispu, value, cat };
