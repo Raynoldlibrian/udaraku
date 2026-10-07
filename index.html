@@ -2,364 +2,482 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Udaraku — Pemantau Kualitas Udara</title>
-<meta name="description" content="Pantau kualitas udara di kotamu secara langsung, dari data real-time.">
-
-<!-- PWA -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#0B1220">
-<meta name="background-color" content="#0B1220">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="format-detection" content="telephone=no">
-
-<!-- iOS home screen -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Udaraku">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-
-<!-- Icons -->
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root{
-    --bg: #0B1220;
-    --surface: #121B2E;
-    --surface-2: #182642;
-    --line: #24324f;
-    --text: #E8EDF5;
-    --text-dim: #8B96AB;
-    --accent: #5EEAD4;
-    --accent-2: #FBBF24;
-  }
-  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
-  html{ -webkit-text-size-adjust:100%; }
-  html,body{ background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; min-height:100vh; overflow-x:hidden; overflow-y:auto; -webkit-overflow-scrolling:touch;}
+    :root { --ispu-color:#ffff00; --bg:#0a0a0a; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html,body { width:100%; overflow-x:hidden; }
+    body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:var(--bg); color:#fff; min-height:100vh; }
+    a { color:var(--ispu-color); }
 
-  /* Mobile-first base (default = phone) */
-  #app{
-    max-width:560px; margin:0 auto; position:relative;
-    padding:calc(env(safe-area-inset-top) + 18px) 16px calc(env(safe-area-inset-bottom) + 40px);
-  }
+    .particles { position:fixed; inset:0; pointer-events:none; z-index:1; }
+    .particle { position:absolute; border-radius:50%; background:var(--ispu-color);
+        box-shadow:0 0 8px color-mix(in srgb, var(--ispu-color) 70%, transparent);
+        animation:float linear infinite; transition:background .8s, box-shadow .8s; }
+    @keyframes float { 0%{transform:translateY(105vh) translateX(0);opacity:0} 10%{opacity:.55} 90%{opacity:.35} 100%{transform:translateY(-10vh) translateX(60px);opacity:0} }
 
-  /* ---------- Header ---------- */
-  .brand{ display:flex; align-items:center; gap:9px; margin-bottom:18px; }
-  .brand .mark{ width:11px; height:11px; border-radius:50%; background:var(--accent); box-shadow:0 0 14px var(--accent); flex-shrink:0; }
-  .brand h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:20px; letter-spacing:0.01em; }
-  .brand span{ color:var(--text-dim); font-size:12px; display:none; }
+    .topbar { position:sticky; top:0; z-index:50; background:linear-gradient(to bottom, rgba(10,10,10,.96) 70%, transparent);
+        backdrop-filter:blur(12px); width:100%; max-width:520px; margin:0 auto; padding:16px 20px 10px; }
+    .brand { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .brand-dot { width:10px; height:10px; border-radius:50%; background:var(--ispu-color); box-shadow:0 0 14px var(--ispu-color); transition:background .8s, box-shadow .8s; }
+    .brand h1 { font-size:18px; letter-spacing:4px; text-transform:uppercase; }
+    .brand small { display:block; font-size:10px; color:#777; letter-spacing:1px; font-weight:400; }
+    .loc-btn { margin-left:auto; width:40px; height:40px; border-radius:50%; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12);
+        color:#ccc; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all .3s; flex-shrink:0; }
+    .loc-btn:hover { color:#fff; background:rgba(255,255,255,.14); }
+    .caption { font-size:11px; color:#888; margin-bottom:6px; }
+    .search-row { display:flex; gap:8px; }
+    .search-bar { flex:1; min-width:0; padding:12px 16px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:#fff; font-size:13px; }
+    .search-bar::placeholder{color:#666}
+    .search-bar:focus{outline:none;border-color:color-mix(in srgb,var(--ispu-color) 60%,transparent)}
+    .btn-small { padding:12px 18px; border-radius:999px; border:none; cursor:pointer; background:var(--ispu-color); color:#000; font-weight:600; font-size:13px; flex-shrink:0; transition:background .8s; }
 
-  .searchbar{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
-  .searchbar input{
-    flex:1 1 100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
-    padding:14px 16px; border-radius:12px; font-family:'Inter',sans-serif; font-size:16px; outline:none;
-    transition:border-color .2s; -webkit-appearance:none;
-  }
-  .searchbar input:focus{ border-color:var(--accent); }
-  .searchbar select{
-    flex:1 1 100%; background:var(--surface); border:1px solid var(--line); color:var(--text);
-    padding:14px 16px; border-radius:12px; font-family:'Inter',sans-serif; font-size:15px; outline:none;
-    transition:border-color .2s; -webkit-appearance:none; appearance:none;
-    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
-    background-position: calc(100% - 22px) calc(1.15em), calc(100% - 16px) calc(1.15em);
-    background-size: 6px 6px, 6px 6px; background-repeat: no-repeat;
-  }
-  .searchbar select:focus{ border-color:var(--accent); }
+    .container { width:100%; max-width:520px; margin:0 auto; padding:0 20px 140px; position:relative; z-index:2; }
 
-  .infobtn{
-    width:100%; background:linear-gradient(135deg, var(--surface-2), var(--surface));
-    border:1px solid var(--line); color:var(--text); padding:15px 16px; border-radius:12px;
-    font-family:'Inter',sans-serif; font-size:14px; font-weight:600; cursor:pointer;
-    transition:all .2s; margin-bottom:6px;
-  }
-  .infobtn:hover{ border-color:var(--accent); }
-  .infobtn:active{ transform:scale(0.98); }
-  .infobtn:disabled{ opacity:0.6; cursor:default; transform:none; }
-  .searchbar .btnrow{ display:flex; gap:8px; width:100%; }
-  .searchbar button{
-    flex:1; background:var(--surface-2); border:1px solid var(--line); color:var(--text);
-    padding:13px 14px; border-radius:12px; font-family:'Inter',sans-serif; font-size:14px; font-weight:500;
-    cursor:pointer; transition:all .2s; white-space:nowrap; min-height:46px;
-  }
-  .searchbar button:active{ transform:scale(0.97); }
-  .searchbar button:hover{ border-color:var(--accent); color:var(--accent); }
-  .searchbar button:focus-visible, .searchbar input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .hint{ font-size:12px; color:var(--text-dim); margin:10px 2px 20px; min-height:16px; line-height:1.5; }
+    .cloud-scene { position:relative; height:210px; margin-top:4px; pointer-events:none; }
+    .puff,.ring { position:absolute; border-radius:50%; transition:background .8s, box-shadow .8s, border-color .8s; }
+    .puff { background:radial-gradient(circle at 32% 28%,
+            color-mix(in srgb, var(--ispu-color) 30%, #fff) 0%,
+            color-mix(in srgb, var(--ispu-color) 70%, #151515) 55%,
+            color-mix(in srgb, var(--ispu-color) 45%, #000) 100%);
+        box-shadow:0 0 90px color-mix(in srgb, var(--ispu-color) 35%, transparent); animation:breathe 6s ease-in-out infinite; }
+    .puff-1{width:220px;height:220px;top:-30px;right:-90px}
+    .puff-2{width:140px;height:140px;top:70px;right:70px;animation-delay:1s}
+    .puff-3{width:105px;height:105px;top:0;right:110px;animation-delay:2s}
+    .ring{border:1px solid color-mix(in srgb,var(--ispu-color) 45%,transparent);background:transparent}
+    .ring-1{width:290px;height:290px;top:-70px;right:-130px}
+    .ring-2{width:350px;height:350px;top:-100px;right:-160px;border-color:color-mix(in srgb,var(--ispu-color) 20%,transparent)}
+    @keyframes breathe { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
 
-  /* ---------- Hero / particle readout ---------- */
-  .hero{
-    position:relative; border-radius:22px; overflow:hidden; border:1px solid var(--line);
-    background: radial-gradient(120% 100% at 50% 0%, var(--surface-2), var(--bg) 70%);
-    margin-bottom:22px; min-height:270px; display:flex; flex-direction:column; align-items:center; justify-content:center;
-  }
-  .hero canvas{ position:absolute; inset:0; width:100%; height:100%; }
-  .hero-content{ position:relative; z-index:2; text-align:center; padding:30px 18px; width:100%; }
-  .loc-name{ font-family:'Space Grotesk',sans-serif; font-size:14px; color:var(--text-dim); margin-bottom:6px; letter-spacing:0.02em; overflow-wrap:break-word; }
+    .ispu-display { text-align:center; margin-top:-20px; position:relative; z-index:3; }
+    .toggle { display:flex; justify-content:center; gap:8px; margin-bottom:14px; flex-wrap:wrap; }
+    .toggle button { padding:8px 16px; border-radius:999px; cursor:pointer; font-size:11px; letter-spacing:1px;
+        background:rgba(20,20,20,.85); border:1px solid rgba(255,255,255,.15); color:#999; backdrop-filter:blur(6px); position:relative; z-index:4; }
+    .toggle button.active { color:#000; background:var(--ispu-color); border-color:var(--ispu-color); font-weight:700; }
+    .ispu-value { font-size:clamp(70px, 20vw, 100px); font-weight:200; line-height:1; color:var(--ispu-color);
+        text-shadow:0 0 40px color-mix(in srgb, var(--ispu-color) 40%, transparent); transition:color .8s, text-shadow .8s; }
+    .ispu-status { font-size:clamp(14px, 4vw, 18px); font-weight:300; letter-spacing:3px; text-transform:uppercase; margin:10px 0; }
+    .ispu-caption { font-size:12px; color:#999; max-width:360px; margin:0 auto 12px; line-height:1.7; padding:0 10px; }
+    .loc-line { font-size:13px; color:#999; margin-bottom:4px; }
+    .dom-line { font-size:12px; color:#777; margin-bottom:4px; }
+    .timestamp { font-size:11px; color:#555; }
 
-  .indextoggle{ display:inline-flex; background:rgba(255,255,255,0.05); border:1px solid var(--line); border-radius:999px; padding:3px; margin-bottom:14px; }
-  .indextoggle button{
-    border:none; background:transparent; color:var(--text-dim); font-family:'Inter',sans-serif; font-size:12px; font-weight:600;
-    padding:7px 14px; border-radius:999px; cursor:pointer; transition:all .2s; letter-spacing:0.02em;
-  }
-  .indextoggle button.active{ background:var(--surface); color:var(--text); }
-  .indextoggle button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+    .scale { margin:26px 0 6px; position:relative; }
+    .scale-bar { display:flex; height:8px; border-radius:99px; overflow:hidden; }
+    .scale-bar i { flex:none; transition:width .5s; }
+    .scale-marker { position:absolute; top:-4px; width:3px; height:16px; background:#fff; border-radius:2px; box-shadow:0 0 8px #fff; transform:translateX(-50%); transition:left .6s; }
+    .scale-labels { position:relative; height:16px; margin-top:6px; font-size:10px; color:#666; }
+    .scale-labels span { position:absolute; transform:translateX(-50%); }
 
-  .aqi-number{ font-family:'IBM Plex Mono',monospace; font-size:64px; font-weight:600; line-height:1; transition:color .5s; }
-  .aqi-label{ font-family:'Inter',sans-serif; font-size:13px; margin-top:4px; letter-spacing:0.05em; text-transform:uppercase; transition:color .5s; }
-  .aqi-sub{ color:var(--text-dim); font-size:13px; margin-top:14px; max-width:300px; margin-left:auto; margin-right:auto; line-height:1.55; }
-  .aqi-updated{ color:var(--text-dim); font-size:11px; margin-top:16px; font-family:'IBM Plex Mono',monospace; }
-  .dominant{ display:inline-block; margin-top:12px; font-size:11px; color:var(--text-dim); background:rgba(255,255,255,0.05); border:1px solid var(--line); border-radius:8px; padding:5px 10px; }
-  .dominant b{ color:var(--text); font-weight:600; }
+    .section { font-size:13px; letter-spacing:2px; text-transform:uppercase; color:#aaa; margin:30px 0 12px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+    .section small { font-size:10px; color:#666; }
+    .pollutant-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+    .pollutant-card { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px 6px; text-align:center; backdrop-filter:blur(10px); min-width:0; }
+    .pollutant-name{font-size:11px;color:#888;letter-spacing:1px;margin-bottom:7px}
+    .pollutant-value{font-size:clamp(16px, 5vw, 20px);font-weight:500;margin-bottom:3px;word-break:break-all}
+    .pollutant-unit{font-size:10px;color:#555}
+    #trendChart { width:100%; height:170px; display:block; }
 
-  /* ---------- Pollutant grid ---------- */
-  .section-label{ font-family:'Space Grotesk',sans-serif; font-size:12px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin:0 0 10px 2px; }
-  .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:26px; }
-  .card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px; position:relative; }
-  .card .name{ font-size:12px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
-  .card .dot{ width:7px; height:7px; border-radius:50%; flex-shrink:0; }
-  .card .val{ font-family:'IBM Plex Mono',monospace; font-size:20px; font-weight:600; }
-  .card .unit{ font-size:11px; color:var(--text-dim); margin-left:3px; }
-  .bar{ height:4px; border-radius:2px; background:var(--line); margin-top:10px; overflow:hidden; }
-  .bar i{ display:block; height:100%; border-radius:2px; transition:width .6s ease, background .5s; }
+    footer { margin-top:36px; font-size:11px; color:#666; line-height:1.7; }
+    footer p { margin-bottom:10px; }
+    footer .credit { color:#555; text-align:center; letter-spacing:1px; }
 
-  /* ---------- Trend ---------- */
-  .trend-wrap{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:16px 14px 8px; margin-bottom:22px; }
-  .trend-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; flex-wrap:wrap; gap:4px; }
-  .trend-head h3{ font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:500; }
-  .trend-head span{ font-size:11px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; }
-  #trendCanvas{ width:100%; height:100px; display:block; }
+    .bottom-nav { position:fixed; bottom:0; left:0; right:0; z-index:100; background:rgba(18,18,18,.95); backdrop-filter:blur(20px);
+        border-top:1px solid rgba(255,255,255,.08); display:grid; grid-template-columns:repeat(3, 1fr); gap:4px;
+        padding:8px calc(8px + env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-right)); }
+    .nav-item { background:none; border:none; cursor:pointer; color:#777; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+        font-size:10px; letter-spacing:1px; padding:8px 4px; border-radius:12px; transition:color .3s, background .3s; min-width:0; min-height:48px; }
+    .nav-item:hover { color:#fff; background:rgba(255,255,255,.07); }
+    .nav-item:disabled { opacity:0.5; cursor:not-allowed; }
 
-  /* ---------- Scale legend ---------- */
-  .scale{ display:flex; border-radius:10px; overflow:hidden; margin-bottom:24px; height:8px; }
-  .scale i{ flex:1; }
-  .scale-labels{ display:flex; justify-content:space-between; font-size:10px; color:var(--text-dim); margin-top:6px; font-family:'IBM Plex Mono',monospace; }
+    .backdrop { position:fixed; inset:0; z-index:900; background:rgba(0,0,0,.55); backdrop-filter:blur(8px); opacity:0; pointer-events:none; transition:opacity .4s; }
+    .backdrop.show { opacity:1; pointer-events:auto; }
+    .sheet { position:fixed; left:0; right:0; bottom:0; z-index:950; width:100%; background:rgba(22,22,22,.96); backdrop-filter:blur(20px);
+        border-top:1px solid rgba(255,255,255,.1); border-radius:24px 24px 0 0; padding:14px 20px calc(24px + env(safe-area-inset-bottom));
+        transform:translateY(105%); transition:transform .45s cubic-bezier(.22,1,.36,1); max-height:85vh; display:flex; flex-direction:column; }
+    .sheet.open { transform:translateY(0); }
+    .sheet-handle { width:44px; height:4px; border-radius:99px; background:rgba(255,255,255,.25); margin:0 auto 16px; flex-shrink:0; }
+    .sheet h3 { font-size:16px; letter-spacing:1px; margin-bottom:4px; }
+    .sheet .caption { margin-bottom:12px; flex-shrink:0; }
+    .kec-list { overflow-y:auto; display:flex; flex-direction:column; gap:8px; padding-right:6px; flex:1; min-height:0;
+        scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.2) transparent; }
+    .kec-list::-webkit-scrollbar { width:4px; }
+    .kec-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:99px; }
+    .kec-item { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-radius:12px; cursor:pointer; text-align:left;
+        background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); color:#ddd; font-size:14px; transition:all .25s; width:100%; }
+    .kec-item i { color:#666; font-style:normal; font-size:11px; margin-left:6px; }
+    .kec-item:hover { background:rgba(255,255,255,.1); transform:translateX(4px); }
+    .kec-item.active { border-color:var(--ispu-color); color:#fff; background:color-mix(in srgb, var(--ispu-color) 14%, transparent); }
+    .kec-item.active::after { content:'✓'; color:var(--ispu-color); font-weight:700; }
 
-  footer{ text-align:center; color:var(--text-dim); font-size:11px; margin-top:8px; line-height:1.65; padding:0 6px; }
-  footer a{ color:var(--text-dim); }
-
-  .skeleton{ opacity:0.4; }
-  @media (prefers-reduced-motion: reduce){ * { animation:none !important; transition:none !important; } }
-
-  /* ---------- Tablet / desktop enhancements ---------- */
-  @media (min-width:640px){
-    #app{ max-width:920px; padding-top:28px; padding-bottom:80px; }
-    .brand{ margin-bottom:22px; }
-    .brand h1{ font-size:22px; }
-    .brand span{ display:inline; font-size:13px; }
-    .searchbar{ flex-wrap:nowrap; }
-    .searchbar input{ flex:1 1 auto; }
-    .searchbar .btnrow{ width:auto; }
-    .searchbar button{ flex:none; }
-    .hero{ min-height:320px; }
-    .aqi-number{ font-size:88px; }
-    .aqi-sub{ max-width:340px; }
-    .grid{ grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); }
-    #trendCanvas{ height:110px; }
-  }
+    .toast { position:fixed; top:18px; left:50%; transform:translate(-50%,-80px); z-index:1200; background:rgba(22,22,22,.95);
+        border:1px solid rgba(255,255,255,.15); padding:10px 20px; border-radius:999px; font-size:12px; max-width:90vw; text-align:center;
+        transition:transform .4s; backdrop-filter:blur(10px); }
+    .toast.show { transform:translate(-50%,0); }
+    
+    /* Hidden template for infographic rendering */
+    .infographic-template { position:absolute; left:-9999px; top:0; }
+    
+    @media (min-width:480px){ .sheet { max-width:480px; margin:0 auto; } }
 </style>
 </head>
 <body>
-<div id="app">
 
-  <div class="brand"><div class="mark" id="brandMark"></div><h1>Udaraku</h1><span>pemantau kualitas udara langsung</span></div>
+<div class="particles" id="particles"></div>
+<div class="toast" id="toast"></div>
+<div class="infographic-template" id="infographicTemplate"></div>
 
-  <div class="section-label" style="margin-top:0;">Pilih kecamatan (Indragiri Hulu)</div>
-  <div class="searchbar" style="margin-bottom:14px;">
-    <select id="kecamatanSelect">
-      <option value="">— Pilih kecamatan —</option>
-    </select>
-  </div>
-
-  <button id="infographicBtn" type="button" class="infobtn">
-    <span id="infographicBtnText">📊 Unduh Infografis (PNG)</span>
-  </button>
-  <button id="mapBtn" type="button" class="infobtn" style="margin-top:8px;">
-    <span id="mapBtnText">🗺️ Unduh Peta Sebaran (PNG)</span>
-  </button>
-  <div class="hint" id="infographicHint"></div>
-
-  <div class="section-label">Atau cari lokasi lain</div>
-  <div class="searchbar">
-    <input id="cityInput" type="text" placeholder="Nama kota, atau tempel koordinat dari Google Maps (mis. -0.4167, 102.5667)…" autocomplete="off" inputmode="search" enterkeyhint="search">
-    <div class="btnrow">
-      <button id="searchBtn">Cari</button>
-      <button id="geoBtn">📍 Lokasi saya</button>
+<header class="topbar">
+    <div class="brand">
+        <div class="brand-dot"></div>
+        <div><h1>Udaraku</h1><small>pemantau kualitas udara langsung</small></div>
+        <button class="loc-btn" id="btnLokasiSaya" title="📍 Lokasi saya">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+            </svg>
+        </button>
     </div>
-  </div>
-  <div class="hint" id="hint">Menampilkan data untuk Rengat, Riau.</div>
-
-  <div class="hero">
-    <canvas id="particleCanvas"></canvas>
-    <div class="hero-content">
-      <div class="loc-name" id="locName">Memuat…</div>
-      <div class="indextoggle" id="indexToggle" role="group" aria-label="Pilih standar indeks">
-        <button id="btnISPU" class="active" type="button">ISPU (Indonesia)</button>
-        <button id="btnAQI" type="button">AQI (US)</button>
-      </div>
-      <div class="aqi-number" id="aqiNumber">--</div>
-      <div class="aqi-label" id="aqiLabel">MEMUAT DATA</div>
-      <div class="aqi-sub" id="aqiSub">Sedang mengambil data kualitas udara terbaru.</div>
-      <div class="dominant" id="dominant" style="display:none;">Parameter dominan: <b id="dominantParam">—</b></div>
-      <div class="aqi-updated" id="aqiUpdated"></div>
+    <div class="caption">Atau cari lokasi lain</div>
+    <div class="search-row">
+        <input type="text" class="search-bar" id="searchInput" placeholder="Nama kota / koordinat (lat,lon)…">
+        <button class="btn-small" id="btnCari">Cari</button>
     </div>
-  </div>
+</header>
 
-  <div class="scale" id="scaleBar">
-    <i style="background:#22C55E"></i><i style="background:#3B82F6"></i><i style="background:#FACC15"></i><i style="background:#EF4444"></i><i style="background:#18181B"></i>
-  </div>
-  <div class="scale-labels" id="scaleLabels"><span>0</span><span>50</span><span>100</span><span>200</span><span>300</span><span>500</span></div>
+<div class="container">
+    <div class="cloud-scene">
+        <div class="ring ring-2"></div><div class="ring ring-1"></div>
+        <div class="puff puff-1"></div><div class="puff puff-3"></div><div class="puff puff-2"></div>
+    </div>
 
-  <div class="section-label">Rincian polutan</div>
-  <div class="grid" id="pollutantGrid"></div>
+    <div class="ispu-display">
+        <div class="toggle">
+            <button id="chipISPU" class="active">ISPU (Indonesia)</button>
+            <button id="chipAQI">AQI (US)</button>
+        </div>
+        <div class="ispu-value" id="ispuValue">--</div>
+        <div class="ispu-status" id="ispuStatus">MEMUAT DATA</div>
+        <div class="ispu-caption" id="ispuCaption"></div>
+        <div class="loc-line" id="locLine">Menampilkan data untuk <b>Rengat, Riau</b>.</div>
+        <div class="dom-line">Parameter dominan: <span id="dominant">—</span></div>
+        <div class="timestamp" id="timestamp">Sedang mengambil data kualitas udara terbaru.</div>
+    </div>
 
-  <div class="trend-wrap">
-    <div class="trend-head"><h3>Tren PM2.5 — 24 jam terakhir</h3><span id="trendRange">µg/m³</span></div>
-    <canvas id="trendCanvas"></canvas>
-  </div>
+    <div class="scale">
+        <div class="scale-bar" id="scaleBar"></div>
+        <div class="scale-marker" id="scaleMarker" style="left:0%"></div>
+        <div class="scale-labels" id="scaleLabels"></div>
+    </div>
 
-  <footer>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC).<br>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.<br>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional. &copy; Raynold — 2026</footer>
+    <div class="section">Rincian polutan</div>
+    <div class="pollutant-grid">
+        <div class="pollutant-card"><div class="pollutant-name">PM2.5</div><div class="pollutant-value" id="v_pm25">--</div><div class="pollutant-unit">µg/m³</div></div>
+        <div class="pollutant-card"><div class="pollutant-name">PM10</div><div class="pollutant-value" id="v_pm10">--</div><div class="pollutant-unit">µg/m³</div></div>
+        <div class="pollutant-card"><div class="pollutant-name">O₃</div><div class="pollutant-value" id="v_o3">--</div><div class="pollutant-unit">µg/m³</div></div>
+        <div class="pollutant-card"><div class="pollutant-name">NO₂</div><div class="pollutant-value" id="v_no2">--</div><div class="pollutant-unit">µg/m³</div></div>
+        <div class="pollutant-card"><div class="pollutant-name">SO₂</div><div class="pollutant-value" id="v_so2">--</div><div class="pollutant-unit">µg/m³</div></div>
+        <div class="pollutant-card"><div class="pollutant-name">CO</div><div class="pollutant-value" id="v_co">--</div><div class="pollutant-unit">mg/m³</div></div>
+    </div>
+
+    <div class="section">Tren PM2.5 — 24 jam terakhir <small>µg/m³</small></div>
+    <canvas id="trendChart"></canvas>
+
+    <footer>
+        <p>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). PM2.5 &amp; PM10 memakai <b>rata-rata 24 jam</b> sesuai standar.</p>
+        <p>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.</p>
+        <p>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</p>
+        <p class="credit">© Raynold — 2026</p>
+    </footer>
 </div>
 
-<!-- Template infografis (di-render off-screen, ditangkap jadi PNG saat tombol unduh diklik) -->
-<div id="infographicTemplate" style="position:fixed; left:-99999px; top:0; width:1080px;"></div>
+<nav class="bottom-nav">
+    <button class="nav-item" id="btnSheet">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        Kecamatan
+    </button>
+    <button class="nav-item" id="btnInfografis">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" y1="20" x2="6" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="18" y1="20" x2="18" y2="14"/></svg>
+        <span id="btnInfografisText">Infografis</span>
+    </button>
+    <button class="nav-item" id="btnPeta">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21"/><line x1="8" y1="3" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="21"/></svg>
+        <span id="btnPetaText">Peta Sebaran</span>
+    </button>
+</nav>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Pilih kecamatan (Indragiri Hulu)</h3>
+    <div class="caption">Kecamatan bertanda (*) = koordinat estimasi</div>
+    <div class="kec-list" id="kecList"></div>
+</div>
 
 <script>
-(function(){
-  const els = {
-    input: document.getElementById('cityInput'),
-    searchBtn: document.getElementById('searchBtn'),
-    geoBtn: document.getElementById('geoBtn'),
-    hint: document.getElementById('hint'),
-    locName: document.getElementById('locName'),
-    aqiNumber: document.getElementById('aqiNumber'),
-    aqiLabel: document.getElementById('aqiLabel'),
-    aqiSub: document.getElementById('aqiSub'),
-    aqiUpdated: document.getElementById('aqiUpdated'),
-    grid: document.getElementById('pollutantGrid'),
-    trendCanvas: document.getElementById('trendCanvas'),
-    trendRange: document.getElementById('trendRange'),
-    brandMark: document.getElementById('brandMark'),
-    btnISPU: document.getElementById('btnISPU'),
-    btnAQI: document.getElementById('btnAQI'),
-    dominant: document.getElementById('dominant'),
-    dominantParam: document.getElementById('dominantParam'),
-    scaleBar: document.getElementById('scaleBar'),
-    scaleLabels: document.getElementById('scaleLabels'),
-    kecamatanSelect: document.getElementById('kecamatanSelect'),
-    infographicBtn: document.getElementById('infographicBtn'),
-    infographicBtnText: document.getElementById('infographicBtnText'),
-    infographicHint: document.getElementById('infographicHint'),
-    mapBtn: document.getElementById('mapBtn'),
-    mapBtnText: document.getElementById('mapBtnText'),
-    infographicTemplate: document.getElementById('infographicTemplate'),
-  };
+/* ================= DATA KECAMATAN LENGKAP ================= */
+const KECAMATAN_INHU = [
+    { name:'Batang Cenaku', lat:-0.44, lon:102.44, ibukota:'Batang Cenaku', est:true },
+    { name:'Batang Gansal', lat:-0.42, lon:102.62, ibukota:'Batang Gansal', est:true },
+    { name:'Batang Peranap', lat:-0.20, lon:102.24, ibukota:'Peranap', est:true },
+    { name:'Kelayang', lat:-0.17, lon:102.20, ibukota:'Kelayang', est:true },
+    { name:'Kuala Cenaku', lat:-0.30, lon:102.62, ibukota:'Kuala Cenaku', est:true },
+    { name:'Lirik', lat:-0.28, lon:102.44, ibukota:'Lirik', est:true },
+    { name:'Lubuk Batu Jaya', lat:-0.11, lon:102.80, ibukota:'Lubuk Batu Jaya', est:true },
+    { name:'Pasir Penyu', lat:-0.26, lon:102.35, ibukota:'Pasir Penyu', est:false },
+    { name:'Peranap', lat:-0.20, lon:102.24, ibukota:'Peranap', est:true },
+    { name:'Rakit Kulim', lat:-0.35, lon:102.75, ibukota:'Rakit Kulim', est:true },
+    { name:'Rengat', lat:-0.09, lon:102.55, ibukota:'Rengat', est:false },
+    { name:'Rengat Barat', lat:-0.10, lon:102.48, ibukota:'Rengat Barat', est:true },
+    { name:'Seberida', lat:-0.36, lon:102.31, ibukota:'Seberida', est:true },
+    { name:'Sungai Lala', lat:-0.13, lon:102.71, ibukota:'Sungai Lala', est:true },
+];
 
-  // ---------------- Data 14 kecamatan Kabupaten Indragiri Hulu, Riau ----------------
-  // Titik koordinat = ibukota kecamatan (pusat pemerintahan), bukan centroid wilayah.
-  // verified:true  → koordinat dicek silang dari sumber (Wikipedia/BPS/latlong.net).
-  // verified:false → estimasi terbaik (kecamatan tetangga/kecamatan induk), SEBAIKNYA
-  //                  diverifikasi manual: cari titik ibukota di Google Maps, klik kanan
-  //                  pada titik itu untuk menyalin koordinatnya, lalu tempel di kolom
-  //                  pencarian "Atau cari lokasi lain" untuk mengecek & mengoreksi di sini.
-  const KECAMATAN_INHU = [
-    { name:'Rengat',         ibukota:'Rengat',            lat:-0.3745648018616207, lon:102.54538123531007, verified:true  },
-    { name:'Rengat Barat',   ibukota:'Pematang Reba',    lat:-0.39485134872313665, lon:102.44858982728763, verified:true },
-    { name:'Seberida',       ibukota:'Pangkalan Kasai',   lat:-0.5929261351763538, lon:102.38909015566851, verified:true  },
-    { name:'Batang Gansal',  ibukota:'Seberida',          lat:-0.7294277671263719, lon:102.51016812296822, verified:true },
-    { name:'Batang Cenaku',  ibukota:'Aur Cina',          lat:-0.6633398294458318, lon:102.27866910268375, verified:true  },
-    { name:'Kelayang',       ibukota:'Simpang Kelayang',  lat:-0.46205048735462395, lon:102.12443260930557, verified:true  },
-    { name:'Rakit Kulim',    ibukota:'Petonggan',         lat:-0.512502989312871, lon:102.19082840930581, verified:true },
-    { name:'Pasir Penyu',    ibukota:'Air Molek',         lat:-0.3515123371536203, lon:102.29772907000459, verified:true },
-    { name:'Lirik',          ibukota:'Lirik',             lat:-0.31207568218042336, lon:102.30951387528113, verified:true },
-    { name:'Sungai Lala',    ibukota:'Kelawat',           lat:-0.38995088502673775, lon:102.22150138232193, verified:true },
-    { name:'Lubuk Batu Jaya',ibukota:'Lubuk Batu Tinggal',lat:-0.3670745131557914, lon:102.14826743814123, verified:true },
-    { name:'Peranap',        ibukota:'Peranap',           lat:-0.520269740547885, lon:101.97134519862495, verified:true  },
-    { name:'Batang Peranap', ibukota:'Selunak',           lat:-0.5530991551516362, lon:101.92258726962577, verified:true },
-    { name:'Kuala Cenaku',   ibukota:'Kuala Cenaku',      lat:-0.4487928014221024, lon:102.67058591729624, verified:true },
-  ];
+/* ===== Kategori ISPU Resmi KLHK (5 warna) ===== */
+const ISPU_CATEGORIES = [
+    { min:0, max:50, label:'Baik', color:'#00e400', advice:'Udara bersih dan aman untuk semua aktivitas luar ruangan. Waktu yang tepat untuk beraktivitas di luar! 🌿' },
+    { min:51, max:100, label:'Sedang', color:'#3b82f6', advice:'Kualitas udara masih dapat diterima. Kelompok sensitif sebaiknya kurangi aktivitas fisik berat di luar.' },
+    { min:101, max:200, label:'Tidak Sehat', color:'#ffff00', advice:'Mulai membahayakan kesehatan. Kurangi aktivitas lama di luar ruangan dan kenakan masker bila perlu.' },
+    { min:201, max:300, label:'Sangat Tidak Sehat', color:'#ff0000', advice:'Hindari aktivitas di luar ruangan. Kenakan masker saat terpaksa keluar dan tutup jendela rumah.' },
+    { min:301, max:500, label:'Berbahaya', color:'#7e0023', advice:'Sangat berbahaya! Tetap di dalam ruangan, tutup rapat jendela, dan gunakan penjernih udara/masker bila tersedia.' },
+];
 
-  let currentMode = 'ispu'; // 'ispu' | 'aqi'
-  let lastData = null;
-  let lastLabel = '';
+/* ===== Kategori AQI US (6 warna) ===== */
+const AQI_CATEGORIES = [
+    { min:0, max:50, label:'Good', color:'#00e400', advice:'Air quality is satisfactory.' },
+    { min:51, max:100, label:'Moderate', color:'#ffff00', advice:'Acceptable air quality; sensitive groups should limit prolonged outdoor exertion.' },
+    { min:101, max:150, label:'Unhealthy (Sensitive)', color:'#ff7e00', advice:'Sensitive groups should limit prolonged outdoor exertion.' },
+    { min:151, max:200, label:'Unhealthy', color:'#ff0000', advice:'Everyone should reduce prolonged outdoor exertion.' },
+    { min:201, max:300, label:'Very Unhealthy', color:'#8f3f97', advice:'Everyone should avoid prolonged outdoor exertion.' },
+    { min:301, max:500, label:'Hazardous', color:'#7e0023', advice:'Emergency conditions; everyone should remain indoors.' },
+];
 
-  const CATEGORIES = [
-    {max:50,  label:'Baik',                 color:'#5EEAD4', advice:'Kualitas udara baik. Aman untuk beraktivitas di luar ruangan.'},
-    {max:100, label:'Sedang',                color:'#FBBF24', advice:'Cukup dapat diterima. Kelompok sangat sensitif sebaiknya waspada.'},
-    {max:150, label:'Tidak sehat (sensitif)',color:'#FB923C', advice:'Kelompok sensitif (anak, lansia, penderita asma) sebaiknya kurangi aktivitas luar.'},
-    {max:200, label:'Tidak sehat',           color:'#F87171', advice:'Semua orang mulai bisa terdampak. Batasi aktivitas fisik lama di luar ruangan.'},
-    {max:300, label:'Sangat tidak sehat',    color:'#C084FC', advice:'Peringatan kesehatan. Hindari aktivitas luar ruangan bila memungkinkan.'},
-    {max:99999,label:'Berbahaya',            color:'#7F1D1D', advice:'Kondisi darurat kesehatan. Tetap di dalam ruangan dan gunakan penyaring udara.'},
-  ];
-  function categoryFor(aqi){ return CATEGORIES.find(c => aqi <= c.max) || CATEGORIES[CATEGORIES.length-1]; }
+const ISPU_PARAM_LABEL = { pm2_5:'PM2.5', pm10:'PM10', so2:'SO₂', no2:'NO₂', o3:'O₃', co:'CO' };
 
-  // ---------------- ISPU (Indeks Standar Pencemar Udara — Permen LHK No. P.14/2020) ----------------
-  // Breakpoint konsentrasi resmi (µg/m³), 6 dari 7 parameter (HC tidak tersedia dari sumber data ini).
-  const ISPU_BREAKPOINTS = {
-    pm10:               [0, 50, 150, 350, 420, 500],
-    pm2_5:               [0, 15.5, 55.4, 150.4, 250.4, 500],
-    sulphur_dioxide:      [0, 52, 180, 400, 800, 1200],
-    carbon_monoxide:      [0, 4000, 8000, 15000, 30000, 45000],
-    ozone:                [0, 120, 235, 400, 800, 1000],
-    nitrogen_dioxide:     [0, 80, 200, 1130, 2260, 3000],
-  };
-  const ISPU_ILEVELS = [0, 50, 100, 200, 300, 500];
-  const ISPU_PARAM_LABEL = { pm10:'PM10', pm2_5:'PM2.5', sulphur_dioxide:'SO₂', carbon_monoxide:'CO', ozone:'O₃', nitrogen_dioxide:'NO₂' };
-  const ISPU_CATEGORIES = [
-    {max:50,  label:'Baik',               color:'#22C55E', advice:'Kualitas udara sangat baik, aman untuk semua aktivitas di luar ruangan.'},
-    {max:100, label:'Sedang',              color:'#3B82F6', advice:'Kualitas udara masih dapat diterima. Kelompok sensitif sebaiknya kurangi aktivitas fisik berat di luar.'},
-    {max:200, label:'Tidak Sehat',         color:'#FACC15', advice:'Mulai merugikan kesehatan. Gunakan masker dan kurangi aktivitas di luar ruangan.'},
-    {max:300, label:'Sangat Tidak Sehat',  color:'#EF4444', advice:'Risiko kesehatan meningkat untuk semua orang. Disarankan tetap di dalam rumah.'},
-    {max:99999,label:'Berbahaya',          color:'#18181B', glow:'#7F1D1D', advice:'Kondisi darurat. Semua orang sebaiknya tidak beraktivitas di luar rumah.'},
-  ];
-  function ispuCategoryFor(v){ return ISPU_CATEGORIES.find(c => v <= c.max) || ISPU_CATEGORIES[ISPU_CATEGORIES.length-1]; }
-  // Warna asli 'Berbahaya' adalah hitam (sesuai standar resmi) — untuk elemen visual di atas
-  // background gelap kita pakai warna glow-nya (merah tua) supaya tetap kelihatan, label tetap "Berbahaya".
-  function displayColor(cat){ return cat.glow || cat.color; }
+/* ===== Ambang batas ISPU — Permen LHK P.14/2020 ===== */
+const BP = {
+    pm2_5:[0,15,35,65,150,250], pm10:[0,50,150,250,420,600],
+    so2:[0,80,160,320,420,2620], no2:[0,100,200,700,1200,2000],
+    o3:[0,60,120,240,400,800],  co:[0,5,10,17,34,46],
+};
+const IDX = [0,50,100,200,300,500];
 
-  function ispuSubIndex(paramKey, concentration){
-    if(concentration == null || isNaN(concentration)) return null;
-    const bp = ISPU_BREAKPOINTS[paramKey];
-    for(let i=0;i<5;i++){
-      const Clow = bp[i], Chigh = bp[i+1];
-      if(concentration <= Chigh || i===4){
-        const Ilow = ISPU_ILEVELS[i], Ihigh = ISPU_ILEVELS[i+1];
-        const c = i===4 ? Math.max(concentration, Clow) : Math.max(Math.min(concentration, Chigh), Clow);
-        return Math.round(((Ihigh-Ilow)/(Chigh-Clow)) * (c-Clow) + Ilow);
-      }
+const $ = id => document.getElementById(id);
+let state = { lat:-0.09, lon:102.55, label:'Rengat, Riau', mode:'ispu', data:null, trend:[], hourlyAvg:null };
+
+const levelsOf = () => state.mode==='ispu' ? ISPU_CATEGORIES : AQI_CATEGORIES;
+const getCategoryFor = (value, categories) => {
+    for (const cat of categories) {
+        if (value >= cat.min && value <= cat.max) return cat;
     }
-  }
+    return categories[categories.length - 1];
+};
+const ispuCategoryFor = v => getCategoryFor(v, ISPU_CATEGORIES);
+const aqiCategoryFor = v => getCategoryFor(v, AQI_CATEGORIES);
+const displayColor = cat => cat.color;
 
-  // Hitung ISPU keseluruhan = nilai maksimum dari sub-indeks tiap parameter (sesuai metode resmi KLHK).
-  function computeISPU(current){
-    let best = null;
-    for(const key of Object.keys(ISPU_BREAKPOINTS)){
-      const sub = ispuSubIndex(key, current[key]);
-      if(sub != null && (best == null || sub > best.value)){
-        best = { value: sub, param: key };
-      }
+/* ===== Rumus ISPU Permen LHK P.14/2020 ===== */
+function subIndex(c, a){
+    if (c == null || isNaN(c)) return null;
+    if (c <= a[0]) return 0;
+    for (let i=1;i<6;i++){
+        if (c <= a[i]){
+            const bl=a[i-1], bp=a[i], il=IDX[i-1], ip=IDX[i];
+            return Math.round((ip-il)/(bp-bl)*(c-bl)+il);
+        }
     }
-    return best; // {value, param} or null
-  }
+    return 500;
+}
 
-  // ---------------- Infografis Kabupaten (unduh PNG) ----------------
-  let html2canvasLoadPromise = null;
-  function loadHtml2Canvas(){
+function computeISPU(cur, hourlyAvg=null){
+    const conc = {
+        pm2_5: hourlyAvg?.pm2_5 ?? cur.pm2_5,
+        pm10:  hourlyAvg?.pm10  ?? cur.pm10,
+        so2:   cur.sulphur_dioxide, no2: cur.nitrogen_dioxide, o3: cur.ozone,
+        co:    (cur.carbon_monoxide ?? null)/1000,
+    };
+    let maxIspu=0, dominantParam='—';
+    for (const k in BP){
+        const s = subIndex(conc[k], BP[k]);
+        if (s != null && s >= maxIspu){ maxIspu=s; dominantParam=k; }
+    }
+    return { value:maxIspu, param:dominantParam, conc };
+}
+
+function calcPM24Avg(hourly, currentTime){
+    if (!hourly?.time) return null;
+    const times = hourly.time;
+    let end = times.findIndex(t => t >= currentTime); if (end < 0) end = times.length;
+    const st = Math.max(0, end-24);
+    const p25=[], p10=[];
+    for (let i=st;i<end;i++){
+        if (hourly.pm2_5?.[i]!=null) p25.push(hourly.pm2_5[i]);
+        if (hourly.pm10?.[i]!=null)  p10.push(hourly.pm10[i]);
+    }
+    const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+    return { pm2_5:avg(p25), pm10:avg(p10), hours_used:p25.length };
+}
+
+/* ===== Skala dinamis per mode ===== */
+function buildScale(){
+    const lv = levelsOf();
+    const bar = $('scaleBar'); bar.innerHTML='';
+    let prev=0;
+    lv.forEach(l=>{
+        const i=document.createElement('i');
+        i.style.width=((l.max-prev)/5)+'%';
+        i.style.background=l.color;
+        bar.appendChild(i); prev=l.max;
+    });
+    const lab=$('scaleLabels'); lab.innerHTML='';
+    [0,...lv.map(l=>l.max)].forEach(m=>{
+        const s=document.createElement('span');
+        s.style.left=(m/5)+'%'; s.textContent=m;
+        lab.appendChild(s);
+    });
+}
+
+/* ================= PARTIKEL ================= */
+for (let i=0;i<40;i++){
+    const p=document.createElement('div'), s=(Math.random()*4+3).toFixed(1);
+    p.className='particle';
+    p.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;opacity:${(Math.random()*.4+.2).toFixed(2)};animation-duration:${Math.random()*12+14}s;animation-delay:-${Math.random()*20}s`;
+    $('particles').appendChild(p);
+}
+
+/* ================= FETCH ================= */
+async function fetchAir(lat,lon){
+    const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}`+
+        `&current=us_aqi,pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`+
+        `&hourly=pm2_5,pm10&past_days=1&forecast_days=1&timezone=auto`;
+    const r=await fetch(url); if(!r.ok) throw 0; return r.json();
+}
+
+async function loadLocation(lat,lon,label){
+    state.lat=lat; state.lon=lon; state.label=label;
+    $('ispuValue').textContent='--'; $('ispuStatus').textContent='MEMUAT DATA';
+    $('ispuCaption').textContent='';
+    $('locLine').innerHTML=`Menampilkan data untuk <b>${label}</b>.`;
+    $('timestamp').textContent='Sedang mengambil data kualitas udara terbaru.';
+    $('dominant').textContent='—';
+    try{
+        const d=await fetchAir(lat,lon);
+        state.data=d;
+        state.hourlyAvg=calcPM24Avg(d.hourly,d.current.time);
+        const times=d.hourly.time; let idx=times.findIndex(t=>t>=d.current.time);
+        if(idx<0) idx=times.length;
+        const st=Math.max(0,idx-24);
+        state.trend=times.slice(st,idx).map((t,i)=>({t,v:d.hourly.pm2_5[st+i]}));
+        render(); drawChart(); renderKecList();
+    }catch(e){
+        $('ispuStatus').textContent='GAGAL MEMUAT';
+        $('timestamp').textContent='Periksa koneksi internet, lalu coba lagi.';
+    }
+}
+
+/* ================= RENDER ================= */
+function render(){
+    const d=state.data; if(!d) return;
+    const { value:ispu, param:dom, conc } = computeISPU(d.current, state.hourlyAvg);
+    const shown = state.mode==='ispu' ? ispu : (d.current.us_aqi ?? ispu);
+    const cat = state.mode==='ispu' ? ispuCategoryFor(ispu) : aqiCategoryFor(shown);
+    document.documentElement.style.setProperty('--ispu-color', cat.color);
+    $('ispuValue').textContent = shown;
+    $('ispuStatus').textContent = state.mode==='ispu' ? cat.label.toUpperCase() : cat.label.toUpperCase();
+    $('ispuCaption').textContent = cat.advice;
+    $('dominant').textContent = ISPU_PARAM_LABEL[dom] || dom;
+    $('timestamp').textContent = 'Diperbarui: ' + (d.current.time||'').replace('T',' ') + ' WIB'
+        + (state.hourlyAvg?.hours_used ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5?.toFixed(1)} µg/m³ (${state.hourlyAvg.hours_used}j)` : '');
+    $('scaleMarker').style.left = Math.min(100, shown/5) + '%';
+    const f=(v,u=0)=> v==null?'--':(+v).toFixed(u);
+    $('v_pm25').textContent=f(conc.pm2_5); $('v_pm10').textContent=f(conc.pm10);
+    $('v_o3').textContent=f(conc.o3);      $('v_no2').textContent=f(conc.no2);
+    $('v_so2').textContent=f(conc.so2);    $('v_co').textContent=f(conc.co,2);
+}
+
+/* ================= CHART ================= */
+function drawChart(){
+    const c=$('trendChart'), dpr=devicePixelRatio||1, w=c.clientWidth, h=170;
+    c.width=w*dpr; c.height=h*dpr;
+    const x=c.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,w,h);
+    const t=state.trend; if(!t.length) return;
+    const vals=t.map(p=>p.v).filter(v=>v!=null); if(!vals.length) return;
+    const min=Math.min(...vals), max=Math.max(...vals), pad=26;
+    const col=getComputedStyle(document.documentElement).getPropertyValue('--ispu-color').trim();
+    const X=i=>pad+i*(w-2*pad)/(t.length-1);
+    const Y=v=>18+(1-(v-min)/((max-min)||1))*(h-62);
+    x.strokeStyle='rgba(255,255,255,.08)'; x.lineWidth=1;
+    for(let g=0;g<3;g++){ const gy=18+g*(h-62)/2; x.beginPath(); x.moveTo(pad,gy); x.lineTo(w-pad,gy); x.stroke(); }
+    const grad=x.createLinearGradient(0,0,0,h); grad.addColorStop(0,col+'44'); grad.addColorStop(1,col+'00');
+    x.beginPath(); t.forEach((p,i)=> i?x.lineTo(X(i),Y(p.v)):x.moveTo(X(i),Y(p.v)));
+    x.lineTo(X(t.length-1),h-40); x.lineTo(X(0),h-40); x.closePath(); x.fillStyle=grad; x.fill();
+    x.beginPath(); t.forEach((p,i)=> i?x.lineTo(X(i),Y(p.v)):x.moveTo(X(i),Y(p.v)));
+    x.strokeStyle=col; x.lineWidth=2; x.shadowColor=col; x.shadowBlur=10; x.stroke(); x.shadowBlur=0;
+    x.fillStyle=col; x.beginPath(); x.arc(X(t.length-1),Y(t[t.length-1].v),4,0,7); x.fill();
+    x.fillStyle='#777'; x.font='10px sans-serif'; x.textAlign='center';
+    t.forEach((p,i)=>{ if(i%6===0) x.fillText(p.t.slice(11,16),X(i),h-22); });
+}
+addEventListener('resize',drawChart);
+
+/* ================= SHEET ================= */
+const sheet=$('sheet'), backdrop=$('backdrop');
+const openSheet =()=>{ sheet.classList.add('open');  backdrop.classList.add('show'); };
+const closeSheet=()=>{ sheet.classList.remove('open');backdrop.classList.remove('show'); };
+$('btnSheet').onclick=openSheet; backdrop.onclick=closeSheet;
+
+function renderKecList(){
+    const wrap=$('kecList'); wrap.innerHTML='';
+    const act=state.label.split(',')[0];
+    KECAMATAN_INHU.forEach(k=>{
+        const b=document.createElement('button');
+        b.className='kec-item'+(k.name===act?' active':'');
+        b.innerHTML=`<span>${k.name}${k.est?' <i>(*)</i>':''}</span>`;
+        b.onclick=()=>{ closeSheet(); loadLocation(k.lat,k.lon,`${k.name}, Riau`); };
+        wrap.appendChild(b);
+    });
+}
+
+/* ================= CARI & LOKASI ================= */
+$('btnCari').onclick=async()=>{
+    const q=$('searchInput').value.trim(); if(!q) return;
+    const m=q.match(/^(-?\d+(\.\d+)?)\s*,\s*(-?\d+(\.\d+)?)$/);
+    if(m){ loadLocation(+m[1],+m[3],`(${m[1]}, ${m[3]})`); return; }
+    toast('Mencari lokasi…');
+    try{
+        const r=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=id&format=json`);
+        const d=await r.json();
+        if(d.results?.length){ const g=d.results[0]; loadLocation(g.latitude,g.longitude,`${g.name}${g.admin1?', '+g.admin1:''}`); }
+        else toast('Lokasi tidak ditemukan 😕');
+    }catch{ toast('Gagal mencari lokasi'); }
+};
+$('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') $('btnCari').click(); });
+$('btnLokasiSaya').onclick=()=>{
+    if(!navigator.geolocation) return toast('Geolokasi tidak didukung');
+    navigator.geolocation.getCurrentPosition(
+        p=>loadLocation(p.coords.latitude,p.coords.longitude,'Lokasi saya'),
+        ()=>toast('Izin lokasi ditolak'));
+};
+
+/* ================= TOGGLE ================= */
+$('chipISPU').onclick=()=>{ state.mode='ispu'; $('chipISPU').classList.add('active'); $('chipAQI').classList.remove('active'); buildScale(); render(); };
+$('chipAQI').onclick =()=>{ state.mode='aqi';  $('chipAQI').classList.add('active');  $('chipISPU').classList.remove('active'); buildScale(); render(); };
+
+/* ================= INFOGRAFIS (kode asli) ================= */
+let html2canvasLoadPromise = null;
+function loadHtml2Canvas(){
     if(window.html2canvas) return Promise.resolve();
     if(html2canvasLoadPromise) return html2canvasLoadPromise;
     html2canvasLoadPromise = new Promise((resolve, reject)=>{
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      s.onload = () => resolve();
-      s.onerror = () => reject(new Error('Gagal memuat pustaka render gambar.'));
-      document.head.appendChild(s);
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error('Gagal memuat pustaka render gambar.'));
+        document.head.appendChild(s);
     });
     return html2canvasLoadPromise;
-  }
+}
 
-  async function fetchAllKecamatan(){
+async function fetchAllKecamatan(){
     const lats = KECAMATAN_INHU.map(k=>k.lat).join(',');
     const lons = KECAMATAN_INHU.map(k=>k.lon).join(',');
     const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&timezone=auto`;
@@ -368,19 +486,19 @@
     const data = await res.json();
     const results = Array.isArray(data) ? data : [data];
     return KECAMATAN_INHU.map((k,i)=>{
-      const cur = results[i] && results[i].current;
-      const ispu = cur ? computeISPU(cur) : null;
-      const value = ispu ? ispu.value : null;
-      const cat = value != null ? ispuCategoryFor(value) : null;
-      return { kec:k, ispu, value, cat };
+        const cur = results[i] && results[i].current;
+        const ispu = cur ? computeISPU(cur) : null;
+        const value = ispu ? ispu.value : null;
+        const cat = value != null ? ispuCategoryFor(value) : null;
+        return { kec:k, ispu, value, cat };
     });
-  }
+}
 
-  function buildInfographicHTML(items){
+function buildInfographicHTML(items){
     const sorted = items.slice().sort((a,b)=>{
-      if(a.value == null) return 1;
-      if(b.value == null) return -1;
-      return b.value - a.value; // terparah (nilai tertinggi) dulu
+        if(a.value == null) return 1;
+        if(b.value == null) return -1;
+        return b.value - a.value;
     });
     const withValue = sorted.filter(it => it.value != null);
     const worst = withValue[0];
@@ -392,212 +510,176 @@
 
     const counts = {};
     items.forEach(it=>{
-      const label = it.cat ? it.cat.label : 'Tidak diketahui';
-      counts[label] = (counts[label]||0) + 1;
+        const label = it.cat ? it.cat.label : 'Tidak diketahui';
+        counts[label] = (counts[label]||0) + 1;
     });
     const order = ['Baik','Sedang','Tidak Sehat','Sangat Tidak Sehat','Berbahaya'];
     const adviceCardsHTML = order.filter(l=>counts[l]).map(label=>{
-      const c = ISPU_CATEGORIES.find(x=>x.label===label);
-      const color = c ? displayColor(c) : '#8B96AB';
-      const advice = c ? c.advice : '';
-      return `
-        <div style="background:#121B2E; border:1px solid #24324f; border-left:6px solid ${color}; border-radius:14px; padding:22px 26px; margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; gap:12px;">
-            <span style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.02em;">${label}</span>
-            <span style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:#8B96AB; white-space:nowrap;">${counts[label]} kecamatan</span>
-          </div>
-          <div style="font-family:'Inter',sans-serif; font-size:17px; color:#E8EDF5; line-height:1.55;">${advice}</div>
-        </div>`;
+        const c = ISPU_CATEGORIES.find(x=>x.label===label);
+        const color = c ? displayColor(c) : '#8B96AB';
+        const advice = c ? c.advice : '';
+        return `
+            <div style="background:#121B2E; border:1px solid #24324f; border-left:6px solid ${color}; border-radius:14px; padding:22px 26px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px; gap:12px;">
+                    <span style="font-family:'Space Grotesk',sans-serif; font-size:24px; font-weight:700; color:${color}; text-transform:uppercase; letter-spacing:0.02em;">${label}</span>
+                    <span style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:#8B96AB; white-space:nowrap;">${counts[label]} kecamatan</span>
+                </div>
+                <div style="font-family:'Inter',sans-serif; font-size:17px; color:#E8EDF5; line-height:1.55;">${advice}</div>
+            </div>`;
     }).join('');
 
     function headlineCard(it, big){
-      if(!it) return '';
-      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
-      return `
-        <div style="flex:1; background:#121B2E; border:1px solid #24324f; border-top:5px solid ${color}; border-radius:18px; padding:28px 22px; text-align:center;">
-          <div style="font-family:'Inter',sans-serif; font-size:16px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">Status ISPU</div>
-          <div style="font-family:'IBM Plex Mono',monospace; font-size:${big?64:52}px; font-weight:600; color:${color}; line-height:1;">${it.value}</div>
-          <div style="font-family:'Space Grotesk',sans-serif; font-size:${big?22:19}px; font-weight:700; color:${color}; text-transform:uppercase; margin-top:8px;">${it.cat.label}</div>
-          <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5; margin-top:16px;">${it.kec.name}</div>
-          <div style="font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; margin-top:2px;">Ibukota: ${it.kec.ibukota}</div>
-        </div>`;
+        if(!it) return '';
+        const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+        return `
+            <div style="flex:1; background:#121B2E; border:1px solid #24324f; border-top:5px solid ${color}; border-radius:18px; padding:28px 22px; text-align:center;">
+                <div style="font-family:'Inter',sans-serif; font-size:16px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">Status ISPU</div>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:${big?64:52}px; font-weight:600; color:${color}; line-height:1;">${it.value}</div>
+                <div style="font-family:'Space Grotesk',sans-serif; font-size:${big?22:19}px; font-weight:700; color:${color}; text-transform:uppercase; margin-top:8px;">${it.cat.label}</div>
+                <div style="font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5; margin-top:16px;">${it.kec.name}</div>
+                <div style="font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; margin-top:2px;">Ibukota: ${it.kec.ibukota}</div>
+            </div>`;
     }
 
     const rowsHTML = sorted.map((it, i)=>{
-      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
-      const value = it.value != null ? it.value : '—';
-      const label = it.cat ? it.cat.label : 'Data tidak tersedia';
-      const dominant = it.ispu ? ISPU_PARAM_LABEL[it.ispu.param] : '—';
-      return `
-        <div style="display:flex; align-items:center; gap:18px; padding:16px 20px; background:${i%2===0 ? '#121B2E' : 'transparent'}; border-radius:12px;">
-          <div style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:#8B96AB; width:28px;">${i+1}</div>
-          <div style="width:12px; height:12px; border-radius:50%; background:${color}; flex-shrink:0;"></div>
-          <div style="flex:1; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5;">${it.kec.name}</div>
-          <div style="font-family:'Inter',sans-serif; font-size:14px; color:#8B96AB; width:110px;">Dominan: ${dominant}</div>
-          <div style="font-family:'Inter',sans-serif; font-size:16px; font-weight:600; color:${color}; width:170px; text-transform:uppercase;">${label}</div>
-          <div style="font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:${color}; width:80px; text-align:right;">${value}</div>
-        </div>`;
+        const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+        const value = it.value != null ? it.value : '—';
+        const label = it.cat ? it.cat.label : 'Data tidak tersedia';
+        const dominant = it.ispu ? ISPU_PARAM_LABEL[it.ispu.param] : '—';
+        return `
+            <div style="display:flex; align-items:center; gap:18px; padding:16px 20px; background:${i%2===0 ? '#121B2E' : 'transparent'}; border-radius:12px;">
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:18px; color:#8B96AB; width:28px;">${i+1}</div>
+                <div style="width:12px; height:12px; border-radius:50%; background:${color}; flex-shrink:0;"></div>
+                <div style="flex:1; font-family:'Space Grotesk',sans-serif; font-size:20px; font-weight:600; color:#E8EDF5;">${it.kec.name}</div>
+                <div style="font-family:'Inter',sans-serif; font-size:14px; color:#8B96AB; width:110px;">Dominan: ${dominant}</div>
+                <div style="font-family:'Inter',sans-serif; font-size:16px; font-weight:600; color:${color}; width:170px; text-transform:uppercase;">${label}</div>
+                <div style="font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:${color}; width:80px; text-align:right;">${value}</div>
+            </div>`;
     }).join('');
 
     return `
-      <div style="width:1080px; background:linear-gradient(180deg, #0B1220, #0d1730); padding:56px; font-family:'Inter',sans-serif; color:#E8EDF5;">
-        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
-          <div style="width:14px; height:14px; border-radius:50%; background:#5EEAD4; box-shadow:0 0 14px #5EEAD4;"></div>
-          <div style="font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;">Udaraku</div>
-        </div>
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:40px; font-weight:700; margin-top:14px; line-height:1.25;">Kualitas Udara<br>Kabupaten Indragiri Hulu</div>
-        <div style="font-family:'IBM Plex Mono',monospace; font-size:16px; color:#8B96AB; margin-top:10px;">${tanggal} WIB &middot; Indeks ISPU (Permen LHK No. P.14/2020)</div>
+        <div style="width:1080px; background:linear-gradient(180deg, #0B1220, #0d1730); padding:56px; font-family:'Inter',sans-serif; color:#E8EDF5;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+                <div style="width:14px; height:14px; border-radius:50%; background:#5EEAD4; box-shadow:0 0 14px #5EEAD4;"></div>
+                <div style="font-family:'Space Grotesk',sans-serif; font-size:22px; font-weight:700;">Udaraku</div>
+            </div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:40px; font-weight:700; margin-top:14px; line-height:1.25;">Kualitas Udara<br>Kabupaten Indragiri Hulu</div>
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:16px; color:#8B96AB; margin-top:10px;">${tanggal} WIB · Indeks ISPU (Permen LHK No. P.14/2020)</div>
+            <div style="display:flex; gap:16px; margin-top:36px;">
+                ${headlineCard(worst, true)}
+                ${headlineCard(median, false)}
+                ${headlineCard(safest, false)}
+            </div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Status &amp; Saran Tindakan</div>
+            <div>${adviceCardsHTML}</div>
+            <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Peringkat 14 Kecamatan</div>
+            <div style="display:flex; flex-direction:column; gap:2px;">${rowsHTML}</div>
+            <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
+                Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
+                Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. <br>
+                &copy; Raynold - 2026
+            </div>
+        </div>`;
+}
 
-        <div style="display:flex; gap:16px; margin-top:36px;">
-          ${headlineCard(worst, true)}
-          ${headlineCard(median, false)}
-          ${headlineCard(safest, false)}
-        </div>
-
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Status &amp; Saran Tindakan</div>
-        <div>${adviceCardsHTML}</div>
-
-        <div style="font-family:'Space Grotesk',sans-serif; font-size:18px; color:#8B96AB; text-transform:uppercase; letter-spacing:0.05em; margin:36px 0 14px;">Peringkat 14 Kecamatan</div>
-        <div style="display:flex; flex-direction:column; gap:2px;">${rowsHTML}</div>
-
-        <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
-          Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
-          Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. <br>
-          &copy; Raynold - 2026
-        </div>
-      </div>`;
-  }
-
-  async function downloadCanvasAsPNG(canvas, filenamePrefix){
+async function downloadCanvasAsPNG(canvas, filenamePrefix){
     return new Promise(resolve=>{
-      canvas.toBlob(blob=>{
-        if(!blob){ resolve(false); return; }
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const stamp = new Date().toISOString().slice(0,10);
-        a.href = url;
-        a.download = `${filenamePrefix}-${stamp}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(()=> URL.revokeObjectURL(url), 4000);
-        resolve(true);
-      }, 'image/png');
+        canvas.toBlob(blob=>{
+            if(!blob){ resolve(false); return; }
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const stamp = new Date().toISOString().slice(0,10);
+            a.href = url;
+            a.download = `${filenamePrefix}-${stamp}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(()=> URL.revokeObjectURL(url), 4000);
+            resolve(true);
+        }, 'image/png');
     });
-  }
+}
 
-  async function generateInfographic(){
-    els.infographicBtn.disabled = true;
-    els.infographicBtnText.textContent = '⏳ Mengambil data 14 kecamatan…';
-    els.infographicHint.textContent = '';
+async function generateInfographic(){
+    const btn = $('btnInfografis');
+    const btnText = $('btnInfografisText');
+    btn.disabled = true;
+    btnText.textContent = '⏳ Mengambil data…';
     try{
-      const items = await fetchAllKecamatan();
-      els.infographicBtnText.textContent = '⏳ Menyusun gambar…';
-      els.infographicTemplate.innerHTML = buildInfographicHTML(items);
-      await loadHtml2Canvas();
-      await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 150)); // beri waktu font & layout settle
-      const canvas1 = await window.html2canvas(els.infographicTemplate.firstElementChild, {
-        backgroundColor: '#0B1220',
-        scale: 2,
-        useCORS: true,
-      });
-      const ok = await downloadCanvasAsPNG(canvas1, 'infografis-kualitas-udara-inhu');
-      els.infographicHint.textContent = ok ? 'Infografis berhasil diunduh.' : 'Gagal membuat gambar.';
+        const items = await fetchAllKecamatan();
+        btnText.textContent = '⏳ Menyusun gambar…';
+        $('infographicTemplate').innerHTML = buildInfographicHTML(items);
+        await loadHtml2Canvas();
+        await document.fonts.ready;
+        await new Promise(r => setTimeout(r, 150));
+        const canvas1 = await window.html2canvas($('infographicTemplate').firstElementChild, {
+            backgroundColor: '#0B1220',
+            scale: 2,
+            useCORS: true,
+        });
+        const ok = await downloadCanvasAsPNG(canvas1, 'infografis-kualitas-udara-inhu');
+        toast(ok ? 'Infografis berhasil diunduh ✔' : 'Gagal membuat gambar.');
     }catch(err){
-      els.infographicHint.textContent = 'Gagal menyusun infografis: ' + err.message;
+        toast('Gagal menyusun infografis: ' + err.message);
     }finally{
-      els.infographicBtn.disabled = false;
-      els.infographicBtnText.textContent = '📊 Unduh Infografis (PNG)';
-      els.infographicTemplate.innerHTML = '';
+        btn.disabled = false;
+        btnText.textContent = 'Infografis';
+        $('infographicTemplate').innerHTML = '';
     }
-  }
-  els.infographicBtn.addEventListener('click', generateInfographic);
+}
+$('btnInfografis').addEventListener('click', generateInfographic);
 
-  async function generateMapPNG(){
-    els.mapBtn.disabled = true;
-    els.mapBtnText.textContent = '⏳ Mengambil data 14 kecamatan…';
-    els.infographicHint.textContent = '';
-    try{
-      const items = await fetchAllKecamatan();
-      els.mapBtnText.textContent = '⏳ Menyusun peta…';
-      await document.fonts.ready;
-      const canvas2 = await buildMapCanvas(items);
-      const ok = await downloadCanvasAsPNG(canvas2, 'peta-sebaran-ispu-inhu');
-      els.infographicHint.textContent = ok ? 'Peta sebaran berhasil diunduh.' : 'Gagal membuat gambar.';
-    }catch(err){
-      els.infographicHint.textContent = 'Gagal menyusun peta: ' + err.message;
-    }finally{
-      els.mapBtn.disabled = false;
-      els.mapBtnText.textContent = '🗺️ Unduh Peta Sebaran (PNG)';
-    }
-  }
-  els.mapBtn.addEventListener('click', generateMapPNG);
+/* ================= PETA SEBARAN (kode asli) ================= */
+const MASK_SRC = 'peta-mask-inhu.png';
+const BORDER_SRC = 'peta-garis-inhu.png';
 
-  // ---------------- Peta sebaran ISPU (choropleth, tanpa data GADM di aplikasi) ----------------
-  // PENTING soal lisensi: peta ini TIDAK memuat/menyimpan data geometri (bentuk) kecamatan sama
-  // sekali. Yang dipakai cuma 2 GAMBAR RASTER statis, dirender satu kali secara terpisah (offline):
-  //  1) peta-mask-inhu.png  — tiap kecamatan diberi warna abu-abu solid ID unik (arbitrer, buatan
-  //     sendiri, BUKAN data geografis). Aplikasi cuma mencocokkan warna ID ini lalu MENGGANTINYA
-  //     jadi warna status ISPU secara piksel-per-piksel (seperti "cat sesuai nomor").
-  //  2) peta-garis-inhu.png — overlay garis batas saja (transparan), ditumpuk di atas untuk
-  //     mempertegas batas antar wilayah.
-  // Karena keduanya raster hasil flatten (bukan koordinat/vektor), tidak ada data yang bisa
-  // diekstrak ulang jadi bentuk geometri presisi seperti file GeoJSON/SHP aslinya.
-  const MASK_SRC = 'peta-mask-inhu.png';
-  const BORDER_SRC = 'peta-garis-inhu.png';
-
-  // Kode warna ID (grayscale) per kecamatan — angka arbitrer buatan sendiri saat generate gambar mask.
-  const MASK_ID_GRAY = {
+const MASK_ID_GRAY = {
     'Batang Cenaku':10, 'Batang Gansal':26, 'Batang Peranap':42, 'Kelayang':58,
     'Kuala Cenaku':74, 'Lirik':90, 'Lubuk Batu Jaya':106, 'Pasir Penyu':122,
     'Peranap':138, 'Rakit Kulim':154, 'Rengat':170, 'Rengat Barat':186,
     'Seberida':202, 'Sungai Lala':218,
-  };
-  // Bounding box lon/lat yang dipakai saat render gambar mask/garis — dipakai lagi di sini
-  // hanya untuk menaruh label nama+nilai di titik ibukota kecamatan (koordinat terverifikasi).
-  const MAP_BBOX = { minLon:101.777, maxLon:102.7201, minLat:-1.09, maxLat:0.1054 };
+};
+const MAP_BBOX = { minLon:101.777, maxLon:102.7201, minLat:-1.09, maxLat:0.1054 };
 
-  const imageLoadCache = {};
-  function loadImageAsset(src){
+const imageLoadCache = {};
+function loadImageAsset(src){
     if(imageLoadCache[src]) return imageLoadCache[src];
     imageLoadCache[src] = new Promise((resolve, reject)=>{
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => reject(new Error('Gagal memuat gambar: ' + src));
-      img.src = src;
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Gagal memuat gambar: ' + src));
+        img.src = src;
     });
     return imageLoadCache[src];
-  }
+}
 
-  function hexToRgb(hex){
+function hexToRgb(hex){
     const num = parseInt(hex.replace('#',''), 16);
     return { r:(num>>16)&255, g:(num>>8)&255, b:num&255 };
-  }
+}
 
-  function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight){
     const words = text.split(' ');
     let line = '', lineY = y;
     for(let n=0;n<words.length;n++){
-      const testLine = line + words[n] + ' ';
-      if(ctx.measureText(testLine).width > maxWidth && n>0){
-        ctx.fillText(line, x, lineY);
-        line = words[n] + ' ';
-        lineY += lineHeight;
-      } else {
-        line = testLine;
-      }
+        const testLine = line + words[n] + ' ';
+        if(ctx.measureText(testLine).width > maxWidth && n>0){
+            ctx.fillText(line, x, lineY);
+            line = words[n] + ' ';
+            lineY += lineHeight;
+        } else {
+            line = testLine;
+        }
     }
     ctx.fillText(line, x, lineY);
     return lineY + lineHeight;
-  }
+}
 
-  async function buildMapCanvas(items){
+async function buildMapCanvas(items){
     const [maskImg, borderImg] = await Promise.all([loadImageAsset(MASK_SRC), loadImageAsset(BORDER_SRC)]);
     const byName = {};
     items.forEach(it => { byName[it.kec.name] = it; });
 
-    // --- Ganti warna ID pada mask jadi warna status ISPU, piksel per piksel ---
     const maskCanvas = document.createElement('canvas');
     maskCanvas.width = maskImg.width; maskCanvas.height = maskImg.height;
     const maskCtx = maskCanvas.getContext('2d');
@@ -607,28 +689,26 @@
 
     const colorLUT = new Array(256).fill(null);
     Object.entries(MASK_ID_GRAY).forEach(([name, gray])=>{
-      const it = byName[name];
-      const color = it && it.cat ? displayColor(it.cat) : '#8B96AB';
-      colorLUT[gray] = hexToRgb(color);
+        const it = byName[name];
+        const color = it && it.cat ? displayColor(it.cat) : '#8B96AB';
+        colorLUT[gray] = hexToRgb(color);
     });
 
     for(let i=0; i<d.length; i+=4){
-      const rgb = colorLUT[d[i]]; // r===g===b pada gambar mask (grayscale)
-      if(rgb){ d[i]=rgb.r; d[i+1]=rgb.g; d[i+2]=rgb.b; d[i+3]=255; }
-      else { d[i+3]=0; } // luar wilayah / tak dikenali → transparan
+        const rgb = colorLUT[d[i]];
+        if(rgb){ d[i]=rgb.r; d[i+1]=rgb.g; d[i+2]=rgb.b; d[i+3]=255; }
+        else { d[i+3]=0; }
     }
     maskCtx.putImageData(imgData, 0, 0);
 
-    // --- Kategori yang benar-benar muncul di antara 14 kecamatan (dinamis, sesuai data live) ---
     const mapCounts = {};
     items.forEach(it=>{
-      const label = it.cat ? it.cat.label : 'Tidak diketahui';
-      mapCounts[label] = (mapCounts[label]||0) + 1;
+        const label = it.cat ? it.cat.label : 'Tidak diketahui';
+        mapCounts[label] = (mapCounts[label]||0) + 1;
     });
     const catOrder = ['Baik','Sedang','Tidak Sehat','Sangat Tidak Sehat','Berbahaya'];
     const presentCats = catOrder.filter(l=>mapCounts[l]).map(l=> ISPU_CATEGORIES.find(c=>c.label===l));
 
-    // --- Susun kanvas infografis (header, legend, kartu saran, peta berwarna, footer) ---
     const PAD = 120, HEADER_H = 300, FOOTER_H = 150, W = 2160;
     const mapW = W - PAD*2;
     const mapH = mapW * (maskImg.height / maskImg.width);
@@ -643,24 +723,22 @@
     const CARD_PADX = 34, CARD_PADY_TOP = 26, CARD_PADY_BOTTOM = 24, LABEL_ROW_H = 40, GAP_LABEL_TEXT = 16, LINE_H = 34, CARD_GAP = 16;
     const cardTextMaxWidth = mapW - CARD_PADX*2;
 
-    // Kanvas sementara khusus buat mengukur teks (sebelum kanvas asli dibuat, karena tingginya
-    // baru diketahui setelah tahu berapa baris tiap pesan saran akan terbungkus).
     const measureCanvas = document.createElement('canvas');
     const mctx = measureCanvas.getContext('2d');
     function countLines(text, font, maxWidth){
-      mctx.font = font;
-      const words = text.split(' ');
-      let line = '', lines = 1;
-      for(let n=0;n<words.length;n++){
-        const testLine = line + words[n] + ' ';
-        if(mctx.measureText(testLine).width > maxWidth && n>0){ lines++; line = words[n] + ' '; }
-        else { line = testLine; }
-      }
-      return lines;
+        mctx.font = font;
+        const words = text.split(' ');
+        let line = '', lines = 1;
+        for(let n=0;n<words.length;n++){
+            const testLine = line + words[n] + ' ';
+            if(mctx.measureText(testLine).width > maxWidth && n>0){ lines++; line = words[n] + ' '; }
+            else { line = testLine; }
+        }
+        return lines;
     }
     const cardHeights = presentCats.map(c=>{
-      const lines = countLines(c.advice, ADVICE_TEXT_FONT, cardTextMaxWidth);
-      return CARD_PADY_TOP + LABEL_ROW_H + GAP_LABEL_TEXT + lines*LINE_H + CARD_PADY_BOTTOM;
+        const lines = countLines(c.advice, ADVICE_TEXT_FONT, cardTextMaxWidth);
+        return CARD_PADY_TOP + LABEL_ROW_H + GAP_LABEL_TEXT + lines*LINE_H + CARD_PADY_BOTTOM;
     });
     const ADVICE_TITLE_H = 56;
     const ADVICE_H = ADVICE_TITLE_H + cardHeights.reduce((a,b)=>a+b,0) + CARD_GAP*Math.max(0,cardHeights.length-1) + 28;
@@ -676,7 +754,6 @@
     grad.addColorStop(0,'#0B1220'); grad.addColorStop(1,'#0d1730');
     ctx.fillStyle = grad; ctx.fillRect(0,0,W,totalH);
 
-    // Header
     ctx.fillStyle = '#5EEAD4';
     ctx.beginPath(); ctx.arc(PAD+14, 66, 14, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#E8EDF5';
@@ -686,20 +763,18 @@
     ctx.fillText('Peta Sebaran Status ISPU', PAD, 168);
     ctx.fillText('Kabupaten Indragiri Hulu', PAD, 236);
 
-    // Legend (dipindah ke bawah judul, font diperbesar)
     let legendY = HEADER_H + LEGEND_H/2 + 8;
     let legendX = PAD;
     ctx.font = LEGEND_FONT;
     ISPU_CATEGORIES.forEach(c=>{
-      const color = displayColor(c);
-      ctx.fillStyle = color;
-      ctx.beginPath(); ctx.arc(legendX+14, legendY, 14, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#E8EDF5';
-      ctx.fillText(c.label, legendX+38, legendY+10);
-      legendX += 38 + ctx.measureText(c.label).width + 52;
+        const color = displayColor(c);
+        ctx.fillStyle = color;
+        ctx.beginPath(); ctx.arc(legendX+14, legendY, 14, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#E8EDF5';
+        ctx.fillText(c.label, legendX+38, legendY+10);
+        legendX += 38 + ctx.measureText(c.label).width + 52;
     });
 
-    // Kartu status & saran tindakan (hanya kategori yang benar-benar muncul di peta ini)
     let cardY = HEADER_H + LEGEND_H;
     ctx.font = ADVICE_TITLE_FONT;
     ctx.fillStyle = '#8B96AB';
@@ -707,52 +782,48 @@
     cardY += ADVICE_TITLE_H;
 
     presentCats.forEach((c, idx)=>{
-      const color = displayColor(c);
-      const h = cardHeights[idx];
-      const boxX = PAD, boxW2 = mapW;
-      const r = 16;
+        const color = displayColor(c);
+        const h = cardHeights[idx];
+        const boxX = PAD, boxW2 = mapW;
+        const r = 16;
 
-      ctx.beginPath();
-      ctx.moveTo(boxX+r, cardY);
-      ctx.arcTo(boxX+boxW2, cardY, boxX+boxW2, cardY+h, r);
-      ctx.arcTo(boxX+boxW2, cardY+h, boxX, cardY+h, r);
-      ctx.arcTo(boxX, cardY+h, boxX, cardY, r);
-      ctx.arcTo(boxX, cardY, boxX+boxW2, cardY, r);
-      ctx.closePath();
-      ctx.fillStyle = '#121B2E';
-      ctx.fill();
-      ctx.fillStyle = color;
-      ctx.fillRect(boxX, cardY, 7, h); // aksen kiri berwarna
+        ctx.beginPath();
+        ctx.moveTo(boxX+r, cardY);
+        ctx.arcTo(boxX+boxW2, cardY, boxX+boxW2, cardY+h, r);
+        ctx.arcTo(boxX+boxW2, cardY+h, boxX, cardY+h, r);
+        ctx.arcTo(boxX, cardY+h, boxX, cardY, r);
+        ctx.arcTo(boxX, cardY, boxX+boxW2, cardY, r);
+        ctx.closePath();
+        ctx.fillStyle = '#121B2E';
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillRect(boxX, cardY, 7, h);
 
-      ctx.textAlign = 'left';
-      ctx.font = ADVICE_LABEL_FONT;
-      ctx.fillStyle = color;
-      ctx.fillText(c.label.toUpperCase(), boxX+CARD_PADX, cardY+CARD_PADY_TOP+30);
+        ctx.textAlign = 'left';
+        ctx.font = ADVICE_LABEL_FONT;
+        ctx.fillStyle = color;
+        ctx.fillText(c.label.toUpperCase(), boxX+CARD_PADX, cardY+CARD_PADY_TOP+30);
 
-      ctx.font = ADVICE_COUNT_FONT;
-      ctx.fillStyle = '#8B96AB';
-      const countText = mapCounts[c.label] + ' kecamatan';
-      const countW = ctx.measureText(countText).width;
-      ctx.fillText(countText, boxX+boxW2-CARD_PADX-countW, cardY+CARD_PADY_TOP+28);
+        ctx.font = ADVICE_COUNT_FONT;
+        ctx.fillStyle = '#8B96AB';
+        const countText = mapCounts[c.label] + ' kecamatan';
+        const countW = ctx.measureText(countText).width;
+        ctx.fillText(countText, boxX+boxW2-CARD_PADX-countW, cardY+CARD_PADY_TOP+28);
 
-      ctx.font = ADVICE_TEXT_FONT;
-      ctx.fillStyle = '#E8EDF5';
-      wrapCanvasText(ctx, c.advice, boxX+CARD_PADX, cardY+CARD_PADY_TOP+LABEL_ROW_H+GAP_LABEL_TEXT+22, cardTextMaxWidth, LINE_H);
+        ctx.font = ADVICE_TEXT_FONT;
+        ctx.fillStyle = '#E8EDF5';
+        wrapCanvasText(ctx, c.advice, boxX+CARD_PADX, cardY+CARD_PADY_TOP+LABEL_ROW_H+GAP_LABEL_TEXT+22, cardTextMaxWidth, LINE_H);
 
-      cardY += h + CARD_GAP;
+        cardY += h + CARD_GAP;
     });
 
-    // Peta berwarna + garis batas
     ctx.drawImage(maskCanvas, PAD, mapTop, mapW, mapH);
     ctx.drawImage(borderImg, PAD, mapTop, mapW, mapH);
 
-    // Label nama + nilai ISPU sebagai callout (balon dengan garis penyambung) di titik ibukota
-    // kecamatan. Posisinya dihitung dulu semua, lalu balon yang bertabrakan digeser otomatis
-    // (biar tidak numpuk saat beberapa kecamatan berdekatan), baru digambar.
     function project(lat, lon){
-      const x = PAD + (lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * mapW;
-      const y = mapTop + (MAP_BBOX.maxLat - lat) / (MAP_BBOX.maxLat - MAP_BBOX.minLat) * mapH;
-      return [x, y];
+        const x = PAD + (lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * mapW;
+        const y = mapTop + (MAP_BBOX.maxLat - lat) / (MAP_BBOX.maxLat - MAP_BBOX.minLat) * mapH;
+        return [x, y];
     }
 
     const NAME_FONT = "700 30px 'Space Grotesk', sans-serif";
@@ -761,453 +832,154 @@
     const CALLOUT_PADX = 26, CALLOUT_H = 118, DOT_R = 12, GAP = 16, RADIUS = 18;
 
     function measureCallout(ctx, name, valueLabel, catLabel){
-      ctx.font = NAME_FONT;
-      const nameW = ctx.measureText(name).width;
-      ctx.font = VALUE_FONT;
-      const valueW = ctx.measureText(valueLabel).width;
-      ctx.font = CAT_FONT;
-      const catText = catLabel.toUpperCase();
-      const catW = ctx.measureText(catText).width;
-      const row2W = valueW + 12 + catW;
-      return { boxW: Math.max(nameW, row2W) + CALLOUT_PADX*2, valueW, catW, catText, row2W };
+        ctx.font = NAME_FONT;
+        const nameW = ctx.measureText(name).width;
+        ctx.font = VALUE_FONT;
+        const valueW = ctx.measureText(valueLabel).width;
+        ctx.font = CAT_FONT;
+        const catText = catLabel.toUpperCase();
+        const catW = ctx.measureText(catText).width;
+        const row2W = valueW + 12 + catW;
+        return { boxW: Math.max(nameW, row2W) + CALLOUT_PADX*2, valueW, catW, catText, row2W };
     }
 
-    // --- Tahap 1: hitung posisi awal tiap balon ---
     const bounds = { left: PAD, right: PAD + mapW, top: mapTop, bottom: mapTop + mapH };
     const labels = items.map(it=>{
-      const [x, y] = project(it.kec.lat, it.kec.lon);
-      const valueLabel = it.value != null ? String(it.value) : '—';
-      const color = it.cat ? displayColor(it.cat) : '#8B96AB';
-      const catLabel = it.cat ? it.cat.label : 'Tidak diketahui';
-      const m = measureCallout(ctx, it.kec.name, valueLabel, catLabel);
-      const boxH = CALLOUT_H;
+        const [x, y] = project(it.kec.lat, it.kec.lon);
+        const valueLabel = it.value != null ? String(it.value) : '—';
+        const color = it.cat ? displayColor(it.cat) : '#8B96AB';
+        const catLabel = it.cat ? it.cat.label : 'Tidak diketahui';
+        const m = measureCallout(ctx, it.kec.name, valueLabel, catLabel);
+        const boxH = CALLOUT_H;
 
-      let flipped = false;
-      let boxTopY = y - DOT_R - GAP - boxH;
-      if(boxTopY < bounds.top + 6){ flipped = true; boxTopY = y + DOT_R + GAP; }
-      let boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-m.boxW-4, x - m.boxW/2));
+        let flipped = false;
+        let boxTopY = y - DOT_R - GAP - boxH;
+        if(boxTopY < bounds.top + 6){ flipped = true; boxTopY = y + DOT_R + GAP; }
+        let boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-m.boxW-4, x - m.boxW/2));
 
-      return { it, x, y, name: it.kec.name, valueLabel, catLabel: m.catText, color,
-                boxW: m.boxW, boxH, valueW: m.valueW, row2W: m.row2W,
-                boxLeftX, boxTopY, flipped };
+        return { it, x, y, name: it.kec.name, valueLabel, catLabel: m.catText, color,
+                    boxW: m.boxW, boxH, valueW: m.valueW, row2W: m.row2W,
+                    boxLeftX, boxTopY, flipped };
     });
 
-    // --- Tahap 2: selesaikan tabrakan antar balon (dorong saling menjauh, beberapa iterasi) ---
     const PAD_GAP = 10;
     for(let iter=0; iter<150; iter++){
-      let moved = false;
-      for(let i=0;i<labels.length;i++){
-        for(let j=i+1;j<labels.length;j++){
-          const a = labels[i], b = labels[j];
-          const ax1=a.boxLeftX-PAD_GAP, ax2=a.boxLeftX+a.boxW+PAD_GAP, ay1=a.boxTopY-PAD_GAP, ay2=a.boxTopY+a.boxH+PAD_GAP;
-          const bx1=b.boxLeftX-PAD_GAP, bx2=b.boxLeftX+b.boxW+PAD_GAP, by1=b.boxTopY-PAD_GAP, by2=b.boxTopY+b.boxH+PAD_GAP;
-          const overlapX = Math.min(ax2,bx2) - Math.max(ax1,bx1);
-          const overlapY = Math.min(ay2,by2) - Math.max(ay1,by1);
-          if(overlapX > 0 && overlapY > 0){
-            moved = true;
-            if(overlapX < overlapY){
-              const shift = overlapX/2 + 1;
-              if(a.boxLeftX < b.boxLeftX){ a.boxLeftX -= shift; b.boxLeftX += shift; }
-              else { a.boxLeftX += shift; b.boxLeftX -= shift; }
-            } else {
-              const shift = overlapY/2 + 1;
-              if(a.boxTopY < b.boxTopY){ a.boxTopY -= shift; b.boxTopY += shift; }
-              else { a.boxTopY += shift; b.boxTopY -= shift; }
+        let moved = false;
+        for(let i=0;i<labels.length;i++){
+            for(let j=i+1;j<labels.length;j++){
+                const a = labels[i], b = labels[j];
+                const ax1=a.boxLeftX-PAD_GAP, ax2=a.boxLeftX+a.boxW+PAD_GAP, ay1=a.boxTopY-PAD_GAP, ay2=a.boxTopY+a.boxH+PAD_GAP;
+                const bx1=b.boxLeftX-PAD_GAP, bx2=b.boxLeftX+b.boxW+PAD_GAP, by1=b.boxTopY-PAD_GAP, by2=b.boxTopY+b.boxH+PAD_GAP;
+                const overlapX = Math.min(ax2,bx2) - Math.max(ax1,bx1);
+                const overlapY = Math.min(ay2,by2) - Math.max(ay1,by1);
+                if(overlapX > 0 && overlapY > 0){
+                    moved = true;
+                    if(overlapX < overlapY){
+                        const shift = overlapX/2 + 1;
+                        if(a.boxLeftX < b.boxLeftX){ a.boxLeftX -= shift; b.boxLeftX += shift; }
+                        else { a.boxLeftX += shift; b.boxLeftX -= shift; }
+                    } else {
+                        const shift = overlapY/2 + 1;
+                        if(a.boxTopY < b.boxTopY){ a.boxTopY -= shift; b.boxTopY += shift; }
+                        else { a.boxTopY += shift; b.boxTopY -= shift; }
+                    }
+                }
             }
-          }
         }
-      }
-      labels.forEach(l=>{
-        l.boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-l.boxW-4, l.boxLeftX));
-        l.boxTopY = Math.max(bounds.top+4, Math.min(bounds.bottom-l.boxH-4, l.boxTopY));
-      });
-      if(!moved) break;
+        labels.forEach(l=>{
+            l.boxLeftX = Math.max(bounds.left+4, Math.min(bounds.right-l.boxW-4, l.boxLeftX));
+            l.boxTopY = Math.max(bounds.top+4, Math.min(bounds.bottom-l.boxH-4, l.boxTopY));
+        });
+        if(!moved) break;
     }
 
-    // --- Tahap 3: gambar garis penyambung, titik lokasi, lalu balonnya ---
     labels.forEach(L=>{
-      const boxCenterX = L.boxLeftX + L.boxW/2;
-      const edgeY = L.flipped ? L.boxTopY : L.boxTopY + L.boxH;
-      const edgeX = Math.max(L.boxLeftX+18, Math.min(L.boxLeftX+L.boxW-18, L.x));
+        const boxCenterX = L.boxLeftX + L.boxW/2;
+        const edgeY = L.flipped ? L.boxTopY : L.boxTopY + L.boxH;
+        const edgeX = Math.max(L.boxLeftX+18, Math.min(L.boxLeftX+L.boxW-18, L.x));
 
-      // Garis penyambung ke titik lokasi
-      ctx.beginPath();
-      ctx.moveTo(edgeX, edgeY);
-      ctx.lineTo(L.x, L.y);
-      ctx.strokeStyle = L.color;
-      ctx.lineWidth = 3;
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(edgeX, edgeY);
+        ctx.lineTo(L.x, L.y);
+        ctx.strokeStyle = L.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
 
-      // Titik lokasi
-      ctx.beginPath(); ctx.arc(L.x, L.y, DOT_R, 0, Math.PI*2);
-      ctx.fillStyle = L.color; ctx.fill();
-      ctx.lineWidth = 3.5; ctx.strokeStyle = '#0B1220'; ctx.stroke();
+        ctx.beginPath(); ctx.arc(L.x, L.y, DOT_R, 0, Math.PI*2);
+        ctx.fillStyle = L.color; ctx.fill();
+        ctx.lineWidth = 3.5; ctx.strokeStyle = '#0B1220'; ctx.stroke();
 
-      // Kotak balon (rounded rect)
-      ctx.beginPath();
-      ctx.moveTo(L.boxLeftX+RADIUS, L.boxTopY);
-      ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY+L.boxH, RADIUS);
-      ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY+L.boxH, RADIUS);
-      ctx.arcTo(L.boxLeftX, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY, RADIUS);
-      ctx.arcTo(L.boxLeftX, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY, RADIUS);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(13,20,36,0.96)';
-      ctx.fill();
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = L.color;
-      ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(L.boxLeftX+RADIUS, L.boxTopY);
+        ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY+L.boxH, RADIUS);
+        ctx.arcTo(L.boxLeftX+L.boxW, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY+L.boxH, RADIUS);
+        ctx.arcTo(L.boxLeftX, L.boxTopY+L.boxH, L.boxLeftX, L.boxTopY, RADIUS);
+        ctx.arcTo(L.boxLeftX, L.boxTopY, L.boxLeftX+L.boxW, L.boxTopY, RADIUS);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(13,20,36,0.96)';
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = L.color;
+        ctx.stroke();
 
-      // Teks: nama (baris 1), nilai + kategori (baris 2)
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#F4F7FB';
-      ctx.font = NAME_FONT;
-      ctx.fillText(L.name, boxCenterX, L.boxTopY + 44);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#F4F7FB';
+        ctx.font = NAME_FONT;
+        ctx.fillText(L.name, boxCenterX, L.boxTopY + 44);
 
-      const row2Y = L.boxTopY + 92;
-      ctx.textAlign = 'left';
-      let curX = boxCenterX - L.row2W/2;
-      ctx.font = VALUE_FONT;
-      ctx.fillStyle = L.color;
-      ctx.fillText(L.valueLabel, curX, row2Y);
-      curX += L.valueW + 12;
-      ctx.font = CAT_FONT;
-      ctx.fillText(L.catLabel, curX, row2Y - 2);
-      ctx.textAlign = 'left';
+        const row2Y = L.boxTopY + 92;
+        ctx.textAlign = 'left';
+        let curX = boxCenterX - L.row2W/2;
+        ctx.font = VALUE_FONT;
+        ctx.fillStyle = L.color;
+        ctx.fillText(L.valueLabel, curX, row2Y);
+        curX += L.valueW + 12;
+        ctx.font = CAT_FONT;
+        ctx.fillText(L.catLabel, curX, row2Y - 2);
+        ctx.textAlign = 'left';
     });
 
-    // Footer / disclaimer
     ctx.font = "400 20px 'Inter', sans-serif";
     ctx.fillStyle = '#8B96AB';
     const footerY = mapTop + mapH + 40;
     wrapCanvasText(ctx,
-      'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
-      PAD, footerY, W-PAD*2, 28);
+        'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
+        PAD, footerY, W-PAD*2, 28);
 
     return canvas;
-  }
+}
 
-  // ---------------- Particle field (signature element) ----------------
-  const canvas = document.getElementById('particleCanvas');
-  const ctx = canvas.getContext('2d');
-  let particles = [];
-  let particleColor = '#5EEAD4';
-  let density = 40;      // number of particles
-  let jitter = 0.3;      // how erratically they move
-  let dpr = Math.min(window.devicePixelRatio || 1, 2);
-
-  function resizeCanvas(){
-    const rect = canvas.parentElement.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    canvas.style.width = rect.width + 'px';
-    canvas.style.height = rect.height + 'px';
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    initParticles(rect.width, rect.height);
-  }
-  function initParticles(w,h){
-    particles = [];
-    for(let i=0;i<density;i++){
-      particles.push({
-        x: Math.random()*w, y: Math.random()*h,
-        vx: (Math.random()-0.5)*0.4, vy: (Math.random()-0.5)*0.4,
-        r: 1 + Math.random()*2.2, o: 0.15 + Math.random()*0.35
-      });
-    }
-  }
-  function animate(){
-    const w = canvas.width/dpr, h = canvas.height/dpr;
-    ctx.clearRect(0,0,w,h);
-    for(const p of particles){
-      p.x += p.vx + (Math.random()-0.5)*jitter;
-      p.y += p.vy + (Math.random()-0.5)*jitter;
-      if(p.x<0) p.x=w; if(p.x>w) p.x=0;
-      if(p.y<0) p.y=h; if(p.y>h) p.y=0;
-      ctx.beginPath();
-      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-      ctx.fillStyle = particleColor;
-      ctx.globalAlpha = p.o;
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-    requestAnimationFrame(animate);
-  }
-  window.addEventListener('resize', resizeCanvas);
-  resizeCanvas();
-  requestAnimationFrame(animate);
-
-  function updateParticlesFor(color, intensity){
-    // intensity: 0..1 relative severity, drives density & jitter of the particle field
-    particleColor = color;
-    density = Math.round(18 + intensity * 90);
-    jitter = 0.15 + intensity * 1.6;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    initParticles(rect.width, rect.height);
-  }
-
-  // ---------------- Pollutant cards ----------------
-  const POLLUTANTS = [
-    {key:'pm2_5', name:'PM2.5', unit:'µg/m³', scaleMax:150},
-    {key:'pm10', name:'PM10', unit:'µg/m³', scaleMax:200},
-    {key:'ozone', name:'Ozon (O₃)', unit:'µg/m³', scaleMax:180},
-    {key:'nitrogen_dioxide', name:'NO₂', unit:'µg/m³', scaleMax:200},
-    {key:'sulphur_dioxide', name:'SO₂', unit:'µg/m³', scaleMax:200},
-    {key:'carbon_monoxide', name:'CO', unit:'µg/m³', scaleMax:4000},
-  ];
-  function renderPollutants(current){
-    els.grid.innerHTML = '';
-    POLLUTANTS.forEach(p=>{
-      const v = current[p.key];
-      const pct = v == null ? 0 : Math.max(4, Math.min(100, (v/p.scaleMax)*100));
-      const sub = ispuSubIndex(p.key, v);
-      const dotColor = sub == null ? '#8B96AB' : displayColor(ispuCategoryFor(sub));
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="name"><span class="dot" style="background:${dotColor}"></span>${p.name}</div>
-        <div><span class="val">${v==null?'—':Math.round(v)}</span><span class="unit">${p.unit}</span></div>
-        <div class="bar"><i style="width:${pct}%; background:${dotColor}"></i></div>
-      `;
-      els.grid.appendChild(card);
-    });
-  }
-
-  // ---------------- Trend chart ----------------
-  function renderTrend(hourly){
-    const tCanvas = els.trendCanvas;
-    const rect = tCanvas.getBoundingClientRect();
-    const w = rect.width, h = rect.height || 110;
-    tCanvas.width = w*dpr; tCanvas.height = h*dpr;
-    tCanvas.style.height = h + 'px';
-    const tctx = tCanvas.getContext('2d');
-    tctx.setTransform(dpr,0,0,dpr,0,0);
-    tctx.clearRect(0,0,w,h);
-
-    const vals = hourly.pm2_5.slice(0,24);
-    const max = Math.max(...vals, 10);
-    const min = 0;
-    const stepX = w / (vals.length - 1);
-
-    // grid baseline
-    tctx.strokeStyle = '#24324f';
-    tctx.lineWidth = 1;
-    tctx.beginPath();
-    tctx.moveTo(0, h-16);
-    tctx.lineTo(w, h-16);
-    tctx.stroke();
-
-    // area
-    tctx.beginPath();
-    vals.forEach((v,i)=>{
-      const x = i*stepX;
-      const y = 8 + (1 - (v-min)/(max-min)) * (h-32);
-      if(i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
-    });
-    const lastX = (vals.length-1)*stepX;
-    tctx.lineTo(lastX, h-16);
-    tctx.lineTo(0, h-16);
-    tctx.closePath();
-    const grad = tctx.createLinearGradient(0,0,0,h);
-    grad.addColorStop(0,'rgba(94,234,212,0.28)');
-    grad.addColorStop(1,'rgba(94,234,212,0.0)');
-    tctx.fillStyle = grad;
-    tctx.fill();
-
-    // line
-    tctx.beginPath();
-    vals.forEach((v,i)=>{
-      const x = i*stepX;
-      const y = 8 + (1 - (v-min)/(max-min)) * (h-32);
-      if(i===0) tctx.moveTo(x,y); else tctx.lineTo(x,y);
-    });
-    tctx.strokeStyle = '#5EEAD4';
-    tctx.lineWidth = 2;
-    tctx.stroke();
-
-    els.trendRange.textContent = `puncak ${Math.round(max)} µg/m³`;
-  }
-
-  // ---------------- Data fetching ----------------
-  async function geocode(name){
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=id&format=json`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if(!data.results || !data.results.length) throw new Error('Kota tidak ditemukan');
-    const r = data.results[0];
-    return { lat:r.latitude, lon:r.longitude, label: [r.name, r.admin1, r.country].filter(Boolean).join(', ') };
-  }
-
-  async function fetchAirQuality(lat, lon, label){
-    setLoadingState();
+async function generateMapPNG(){
+    const btn = $('btnPeta');
+    const btnText = $('btnPetaText');
+    btn.disabled = true;
+    btnText.textContent = '⏳ Mengambil data…';
     try{
-      const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=pm2_5,us_aqi&timezone=auto&forecast_days=1`;
-      const res = await fetch(url);
-      if(!res.ok) throw new Error('Gagal mengambil data');
-      const data = await res.json();
-      renderAll(data, label);
+        const items = await fetchAllKecamatan();
+        btnText.textContent = '⏳ Menyusun peta…';
+        await document.fonts.ready;
+        const canvas2 = await buildMapCanvas(items);
+        const ok = await downloadCanvasAsPNG(canvas2, 'peta-sebaran-ispu-inhu');
+        toast(ok ? 'Peta sebaran berhasil diunduh ✔' : 'Gagal membuat gambar.');
     }catch(err){
-      els.hint.textContent = 'Gagal memuat data: ' + err.message + '. Coba kota lain.';
+        toast('Gagal menyusun peta: ' + err.message);
+    }finally{
+        btn.disabled = false;
+        btnText.textContent = 'Peta Sebaran';
     }
-  }
+}
+$('btnPeta').addEventListener('click', generateMapPNG);
 
-  function setLoadingState(){
-    els.aqiNumber.textContent = '--';
-    els.aqiLabel.textContent = 'MEMUAT DATA';
-    els.aqiSub.textContent = 'Sedang mengambil data kualitas udara terbaru.';
-    els.locName.classList.add('skeleton');
-    els.dominant.style.display = 'none';
-  }
+/* ================= TOAST & REFRESH ================= */
+let toastT;
+function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+    clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3000); }
+setInterval(()=>loadLocation(state.lat,state.lon,state.label), 3600000);
 
-  function renderAll(data, label){
-    lastData = data;
-    lastLabel = label;
-    els.locName.classList.remove('skeleton');
-    els.locName.textContent = label;
-    els.aqiUpdated.textContent = 'Diperbarui ' + new Date(data.current.time).toLocaleString('id-ID', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'short'});
-
-    renderIndex();
-    renderPollutants(data.current);
-    renderTrend(data.hourly);
-  }
-
-  function renderIndex(){
-    if(!lastData) return;
-    const cur = lastData.current;
-
-    if(currentMode === 'ispu'){
-      const result = computeISPU(cur);
-      const value = result ? result.value : 0;
-      const cat = ispuCategoryFor(value);
-      const color = displayColor(cat);
-
-      els.aqiNumber.textContent = result ? value : '—';
-      els.aqiNumber.style.color = color;
-      els.aqiLabel.textContent = cat.label.toUpperCase() + ' · ISPU';
-      els.aqiLabel.style.color = color;
-      els.aqiSub.textContent = cat.advice;
-      els.brandMark.style.background = color;
-      els.brandMark.style.boxShadow = `0 0 14px ${color}`;
-      updateParticlesFor(color, Math.min(value,300)/300);
-
-      if(result){
-        els.dominant.style.display = 'inline-block';
-        els.dominantParam.textContent = ISPU_PARAM_LABEL[result.param];
-      } else {
-        els.dominant.style.display = 'none';
-      }
-      els.scaleBar.innerHTML = ISPU_CATEGORIES.map(c=>`<i style="background:${displayColor(c)}"></i>`).join('');
-      els.scaleLabels.innerHTML = '<span>0</span><span>50</span><span>100</span><span>200</span><span>300</span><span>500</span>';
-    } else {
-      const aqi = Math.round(cur.us_aqi ?? 0);
-      const cat = categoryFor(aqi);
-
-      els.aqiNumber.textContent = aqi;
-      els.aqiNumber.style.color = cat.color;
-      els.aqiLabel.textContent = cat.label.toUpperCase() + ' · US AQI';
-      els.aqiLabel.style.color = cat.color;
-      els.aqiSub.textContent = cat.advice;
-      els.brandMark.style.background = cat.color;
-      els.brandMark.style.boxShadow = `0 0 14px ${cat.color}`;
-      updateParticlesFor(cat.color, Math.min(aqi,300)/300);
-
-      els.dominant.style.display = 'none';
-      els.scaleBar.innerHTML = CATEGORIES.map(c=>`<i style="background:${c.color}"></i>`).join('');
-      els.scaleLabels.innerHTML = '<span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300</span><span>500</span>';
-    }
-  }
-
-  function setMode(mode){
-    if(currentMode === mode) return;
-    currentMode = mode;
-    els.btnISPU.classList.toggle('active', mode==='ispu');
-    els.btnAQI.classList.toggle('active', mode==='aqi');
-    renderIndex();
-  }
-  els.btnISPU.addEventListener('click', ()=> setMode('ispu'));
-  els.btnAQI.addEventListener('click', ()=> setMode('aqi'));
-
-  async function searchCity(name){
-    if(!name.trim()) return;
-
-    // Deteksi format koordinat hasil paste dari Google Maps, mis. "-0.4167, 102.5667"
-    const coordMatch = name.trim().match(/^(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
-    if(coordMatch){
-      const lat = parseFloat(coordMatch[1]), lon = parseFloat(coordMatch[2]);
-      if(Math.abs(lat) > 90 || Math.abs(lon) > 180){
-        els.hint.textContent = 'Format koordinat tidak valid. Gunakan format "lintang, bujur", mis. -0.4167, 102.5667.';
-        return;
-      }
-      els.hint.textContent = `Menampilkan data untuk koordinat ${lat}, ${lon}…`;
-      els.kecamatanSelect.value = '';
-      let label = `Koordinat ${lat}, ${lon}`;
-      try{
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&accept-language=id`);
-        if(res.ok){
-          const data = await res.json();
-          const a = data.address || {};
-          const parts = [a.village || a.town || a.suburb || a.city_district || a.municipality, a.county || a.city, a.state].filter(Boolean);
-          if(parts.length) label = parts.join(', ');
-        }
-      }catch(err){ /* reverse geocoding gagal — pakai label koordinat mentah */ }
-      els.hint.textContent = `Menampilkan data untuk ${label}.`;
-      fetchAirQuality(lat, lon, label);
-      return;
-    }
-
-    els.hint.textContent = `Mencari "${name}"…`;
-    try{
-      const loc = await geocode(name);
-      els.kecamatanSelect.value = '';
-      els.hint.textContent = `Menampilkan data untuk ${loc.label}.`;
-      fetchAirQuality(loc.lat, loc.lon, loc.label);
-    }catch(err){
-      els.hint.textContent = err.message + '. Coba nama kota lain, atau tempel koordinat dari Google Maps.';
-    }
-  }
-
-  // ---------------- Dropdown kecamatan Indragiri Hulu ----------------
-  KECAMATAN_INHU.forEach((k, i)=>{
-    const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = k.name + (k.verified ? '' : ' *');
-    els.kecamatanSelect.appendChild(opt);
-  });
-  els.kecamatanSelect.addEventListener('change', ()=>{
-    const idx = els.kecamatanSelect.value;
-    if(idx === '') return;
-    const k = KECAMATAN_INHU[idx];
-    els.input.value = '';
-    const note = k.verified ? '' : ' (koordinat estimasi, belum terverifikasi — lihat catatan di kode)';
-    els.hint.textContent = `Menampilkan data untuk ${k.name} (ibukota: ${k.ibukota}), Indragiri Hulu.${note}`;
-    fetchAirQuality(k.lat, k.lon, `${k.name}, Indragiri Hulu`);
-  });
-
-  function useMyLocation(){
-    if(!navigator.geolocation){ els.hint.textContent = 'Geolokasi tidak didukung di perangkat ini.'; return; }
-    els.hint.textContent = 'Mengambil lokasi Anda…';
-    els.kecamatanSelect.value = '';
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const {latitude, longitude} = pos.coords;
-      els.hint.textContent = 'Menampilkan data untuk lokasi Anda saat ini.';
-      fetchAirQuality(latitude, longitude, 'Lokasi Anda saat ini');
-    }, err=>{
-      els.hint.textContent = 'Tidak bisa mengambil lokasi: ' + err.message;
-    });
-  }
-
-  els.searchBtn.addEventListener('click', ()=> searchCity(els.input.value));
-  els.input.addEventListener('keydown', e=>{ if(e.key==='Enter') searchCity(els.input.value); });
-  els.geoBtn.addEventListener('click', useMyLocation);
-
-  // Initial load — default to Rengat
-  searchCity('Rengat');
-
-  // Register service worker (enables install prompt + offline app shell)
-  if('serviceWorker' in navigator){
-    window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').catch(()=>{ /* file:// or unsupported host — ignore */ });
-    });
-  }
-})();
+/* ================= INIT ================= */
+buildScale();
+renderKecList();
+loadLocation(state.lat,state.lon,state.label);
 </script>
 </body>
 </html>
