@@ -138,7 +138,7 @@
             </svg>
         </button>
     </div>
-    <div class="caption">Atau cari lokasi lain</div>
+    <!-- <div class="caption">Atau cari lokasi lain</div> -->
     <div class="search-row">
         <input type="text" class="search-bar" id="searchInput" placeholder="Nama kota / koordinat (lat,lon)…">
         <button class="btn-small" id="btnCari">Cari</button>
@@ -217,20 +217,20 @@
 <script>
 /* ================= DATA KECAMATAN LENGKAP ================= */
 const KECAMATAN_INHU = [
-    { name:'Batang Cenaku', lat:-0.44, lon:102.44, ibukota:'Batang Cenaku', est:true },
-    { name:'Batang Gansal', lat:-0.42, lon:102.62, ibukota:'Batang Gansal', est:true },
-    { name:'Batang Peranap', lat:-0.20, lon:102.24, ibukota:'Peranap', est:true },
-    { name:'Kelayang', lat:-0.17, lon:102.20, ibukota:'Kelayang', est:true },
-    { name:'Kuala Cenaku', lat:-0.30, lon:102.62, ibukota:'Kuala Cenaku', est:true },
-    { name:'Lirik', lat:-0.28, lon:102.44, ibukota:'Lirik', est:true },
-    { name:'Lubuk Batu Jaya', lat:-0.11, lon:102.80, ibukota:'Lubuk Batu Jaya', est:true },
-    { name:'Pasir Penyu', lat:-0.26, lon:102.35, ibukota:'Pasir Penyu', est:false },
-    { name:'Peranap', lat:-0.20, lon:102.24, ibukota:'Peranap', est:true },
-    { name:'Rakit Kulim', lat:-0.35, lon:102.75, ibukota:'Rakit Kulim', est:true },
-    { name:'Rengat', lat:-0.09, lon:102.55, ibukota:'Rengat', est:false },
-    { name:'Rengat Barat', lat:-0.10, lon:102.48, ibukota:'Rengat Barat', est:true },
-    { name:'Seberida', lat:-0.36, lon:102.31, ibukota:'Seberida', est:true },
-    { name:'Sungai Lala', lat:-0.13, lon:102.71, ibukota:'Sungai Lala', est:true },
+    { name:'Rengat',         ibukota:'Rengat',            lat:-0.3745648018616207, lon:102.54538123531007, verified:true  },
+    { name:'Rengat Barat',   ibukota:'Pematang Reba',    lat:-0.39485134872313665, lon:102.44858982728763, verified:true },
+    { name:'Seberida',       ibukota:'Pangkalan Kasai',   lat:-0.5929261351763538, lon:102.38909015566851, verified:true  },
+    { name:'Batang Gansal',  ibukota:'Seberida',          lat:-0.7294277671263719, lon:102.51016812296822, verified:true },
+    { name:'Batang Cenaku',  ibukota:'Aur Cina',          lat:-0.6633398294458318, lon:102.27866910268375, verified:true  },
+    { name:'Kelayang',       ibukota:'Simpang Kelayang',  lat:-0.46205048735462395, lon:102.12443260930557, verified:true  },
+    { name:'Rakit Kulim',    ibukota:'Petonggan',         lat:-0.512502989312871, lon:102.19082840930581, verified:true },
+    { name:'Pasir Penyu',    ibukota:'Air Molek',         lat:-0.3515123371536203, lon:102.29772907000459, verified:true },
+    { name:'Lirik',          ibukota:'Lirik',             lat:-0.31207568218042336, lon:102.30951387528113, verified:true },
+    { name:'Sungai Lala',    ibukota:'Kelawat',           lat:-0.38995088502673775, lon:102.22150138232193, verified:true },
+    { name:'Lubuk Batu Jaya',ibukota:'Lubuk Batu Tinggal',lat:-0.3670745131557914, lon:102.14826743814123, verified:true },
+    { name:'Peranap',        ibukota:'Peranap',           lat:-0.520269740547885, lon:101.97134519862495, verified:true  },
+    { name:'Batang Peranap', ibukota:'Selunak',           lat:-0.5530991551516362, lon:101.92258726962577, verified:true },
+    { name:'Kuala Cenaku',   ibukota:'Kuala Cenaku',      lat:-0.4487928014221024, lon:102.67058591729624, verified:true },
 ];
 
 /* ===== Kategori ISPU Resmi KLHK (5 warna) ===== */
