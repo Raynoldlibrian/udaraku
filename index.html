@@ -19,7 +19,7 @@
 
     .topbar { position:sticky; top:0; z-index:50; background:linear-gradient(to bottom, rgba(10,10,10,.96) 70%, transparent);
         backdrop-filter:blur(12px); width:100%; max-width:520px; margin:0 auto; padding:16px 20px 10px; }
-    .brand { display:flex; align-items:center; gap:10px; margin-:12px; }
+    .brand { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .brand-dot { width:10px; height:10px; border-radius:50%; background:var(--ispu-color); box-shadow:0 0 14px var(--ispu-color); transition:background .8s, box-shadow .8s; }
     .brand h1 { font-size:18px; letter-spacing:4px; text-transform:uppercase; }
     .brand small { display:block; font-size:10px; color:#777; letter-spacing:1px; font-weight:400; }
@@ -71,7 +71,12 @@
     .scale-labels span { position:absolute; transform:translateX(-50%); }
 
     .section { font-size:13px; letter-spacing:2px; text-transform:uppercase; color:#aaa; margin:30px 0 12px; display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
-    .section small { font-size:10px; color:#666; }
+    .section small { font-size:10px; color:#666; text-transform:none; letter-spacing:0; }
+    .now-line { font-size:12px; color:#bbb; margin:6px auto 4px; max-width:380px; line-height:1.6; padding:0 10px; }
+    .now-line small { display:block; color:#666; font-size:10px; }
+    .smoke-banner { display:none; margin:14px auto 0; max-width:400px; padding:10px 14px; border-radius:12px; font-size:12px; line-height:1.6;
+        color:#ffd9a0; background:rgba(255,126,0,.12); border:1px solid rgba(255,126,0,.45); text-align:left; }
+    .model-note { font-size:10px; color:#666; margin-top:8px; }
     .pollutant-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
     .pollutant-card { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); border-radius:14px; padding:14px 6px; text-align:center; backdrop-filter:blur(10px); min-width:0; }
     .pollutant-name{font-size:11px;color:#888;letter-spacing:1px;margin-bottom:7px}
@@ -83,7 +88,7 @@
     footer p { margin-bottom:10px; }
     footer .credit { color:#555; text-align:center; letter-spacing:1px; }
 
-    .bottom-nav { position:fixed; bottom:0; left:0; right:0; z-index:100; background:rgba(18,18,18,.10); backdrop-filter:blur(10px);
+    .bottom-nav { position:fixed; bottom:0; left:0; right:0; z-index:100; background:rgba(18,18,18,.88); backdrop-filter:blur(20px);
         border-top:1px solid rgba(255,255,255,.08); display:grid; grid-template-columns:repeat(3, 1fr); gap:4px;
         padding:8px calc(8px + env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-right)); }
     .nav-item { background:none; border:none; cursor:pointer; color:#777; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
@@ -162,6 +167,9 @@
         <div class="loc-line" id="locLine">Menampilkan data untuk <b>Rengat, Riau</b>.</div>
         <div class="dom-line">Parameter dominan: <span id="dominant">—</span></div>
         <div class="timestamp" id="timestamp">Sedang mengambil data kualitas udara terbaru.</div>
+        <div class="model-note">Estimasi model CAMS (Open-Meteo), bukan pengukuran stasiun.</div>
+        <div class="now-line" id="nowLine" style="display:none"></div>
+        <div class="smoke-banner" id="smokeBanner"></div>
     </div>
 
     <div class="scale">
@@ -185,7 +193,7 @@
 
     <footer>
         <p>Konsentrasi polutan dari <a href="https://open-meteo.com/" target="_blank">Open-Meteo</a> (model CAMS), diperbarui setiap jam. Nilai ISPU dihitung otomatis di aplikasi ini memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). PM2.5 &amp; PM10 memakai <b>rata-rata 24 jam</b> sesuai standar.</p>
-        <p>Kecamatan bertanda (*) memakai koordinat estimasi (belum terverifikasi) — cek titik ibukota kecamatan di Google Maps lalu tempel koordinatnya di kolom pencarian untuk mengoreksi.</p>
+        <p>Data berasal dari model atmosfer global beresolusi kasar (puluhan km), bukan sensor di lapangan. Saat kabut asap lokal, nilai model bisa lebih rendah dari kondisi sebenarnya, dan beberapa kecamatan yang berdekatan dapat menampilkan nilai yang sama. Baris "Kondisi saat ini" memakai PM2.5 jam terakhir dan bersifat indikatif, bukan ISPU resmi.</p>
         <p>Bukan pengganti data resmi <a href="https://ispu.menlhk.go.id/" target="_blank">ISPU KLHK</a>, dan bukan alat medis — untuk kondisi kesehatan serius, konsultasikan ke tenaga profesional.</p>
         <p class="credit">© Raynold — 2026</p>
     </footer>
@@ -210,7 +218,7 @@
 <div class="sheet" id="sheet">
     <div class="sheet-handle"></div>
     <h3>Pilih kecamatan (Indragiri Hulu)</h3>
-    <div class="caption">Kecamatan bertanda (*) = koordinat estimasi</div>
+    <div class="caption">Titik data = koordinat ibukota kecamatan (resolusi model kasar, nilai antar kecamatan bisa sama)</div>
     <div class="kec-list" id="kecList"></div>
 </div>
 
@@ -256,10 +264,16 @@ const ISPU_PARAM_LABEL = { pm2_5:'PM2.5', pm10:'PM10', so2:'SO₂', no2:'NO₂',
 
 /* ===== Ambang batas ISPU — Permen LHK P.14/2020 ===== */
 const BP = {
-    pm2_5:[0,15,35,65,150,250], pm10:[0,50,150,250,420,600],
-    so2:[0,80,160,320,420,2620], no2:[0,100,200,700,1200,2000],
-    o3:[0,60,120,240,400,800],  co:[0,5,10,17,34,46],
+    pm2_5:[0,15.5,55.4,150.4,250.4,500],  // µg/m³, rata-rata 24 jam
+    pm10: [0,50,150,350,420,500],         // µg/m³, rata-rata 24 jam
+    so2:  [0,52,180,400,800,1200],        // µg/m³, 1 jam
+    no2:  [0,80,200,1130,2260,3000],      // µg/m³, 1 jam
+    o3:   [0,120,235,400,800,1000],       // µg/m³, 1 jam
+    co:   [0,4,8,15,30,45],               // mg/m³, rata-rata 8 jam
 };
+const MIN_PM_HOURS = 18;   // minimal jam data untuk rata-rata 24 jam
+const MIN_CO_HOURS = 6;    // minimal jam data untuk rata-rata 8 jam
+const AOD_WARN = 0.6;      // ambang indikasi asap/kabut (aerosol optical depth), heuristik — silakan sesuaikan
 const IDX = [0,50,100,200,300,500];
 
 const $ = id => document.getElementById(id);
@@ -289,33 +303,52 @@ function subIndex(c, a){
     return 500;
 }
 
-function computeISPU(cur, hourlyAvg=null){
+function computeISPU(cur, avgs=null){
     const conc = {
-        pm2_5: hourlyAvg?.pm2_5 ?? cur.pm2_5,
-        pm10:  hourlyAvg?.pm10  ?? cur.pm10,
+        pm2_5: avgs?.pm2_5 ?? cur.pm2_5,
+        pm10:  avgs?.pm10  ?? cur.pm10,
         so2:   cur.sulphur_dioxide, no2: cur.nitrogen_dioxide, o3: cur.ozone,
-        co:    (cur.carbon_monoxide ?? null)/1000,
+        co:    avgs?.co ?? (cur.carbon_monoxide != null ? cur.carbon_monoxide/1000 : null),
     };
-    let maxIspu=0, dominantParam='—';
+    let maxIspu=-1, dominantParam=null;
     for (const k in BP){
         const s = subIndex(conc[k], BP[k]);
-        if (s != null && s >= maxIspu){ maxIspu=s; dominantParam=k; }
+        if (s != null && s > maxIspu){ maxIspu=s; dominantParam=k; }
     }
+    if (dominantParam === null) return { value:null, param:null, conc };   // tidak ada data sama sekali
     return { value:maxIspu, param:dominantParam, conc };
 }
 
+/* indeks terakhir yang waktunya <= waktu saat ini, +1 (jam berjalan ikut dihitung) */
+function windowEnd(times, currentTime){
+    const i = times.findIndex(t => t > currentTime);
+    return i < 0 ? times.length : i;
+}
+
+/* Rata-rata: PM2.5 & PM10 = 24 jam, CO = 8 jam (sesuai P.14/2020). Mengembalikan null per parameter bila data kurang. */
 function calcPM24Avg(hourly, currentTime){
     if (!hourly?.time) return null;
-    const times = hourly.time;
-    let end = times.findIndex(t => t >= currentTime); if (end < 0) end = times.length;
-    const st = Math.max(0, end-24);
-    const p25=[], p10=[];
-    for (let i=st;i<end;i++){
-        if (hourly.pm2_5?.[i]!=null) p25.push(hourly.pm2_5[i]);
-        if (hourly.pm10?.[i]!=null)  p10.push(hourly.pm10[i]);
-    }
-    const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-    return { pm2_5:avg(p25), pm10:avg(p10), hours_used:p25.length };
+    const end = windowEnd(hourly.time, currentTime);
+    const win = (key,n)=>{
+        const a=[]; for (let i=Math.max(0,end-n); i<end; i++){ const v=hourly[key]?.[i]; if (v!=null) a.push(v); }
+        return a;
+    };
+    const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : null;
+    const p25=win('pm2_5',24), p10=win('pm10',24), co=win('carbon_monoxide',8);
+    return {
+        pm2_5: p25.length>=MIN_PM_HOURS ? avg(p25) : null,
+        pm10:  p10.length>=MIN_PM_HOURS ? avg(p10) : null,
+        co:    co.length>=MIN_CO_HOURS  ? avg(co)/1000 : null,   // µg/m³ → mg/m³
+        hours_used:p25.length, co_hours:co.length,
+    };
+}
+
+function tzLabel(sec){
+    if (sec===25200) return 'WIB';
+    if (sec===28800) return 'WITA';
+    if (sec===32400) return 'WIT';
+    if (sec==null) return '';
+    const h=sec/3600; return 'UTC'+(h>=0?'+':'')+h;
 }
 
 /* ===== Skala dinamis per mode ===== */
@@ -348,8 +381,8 @@ for (let i=0;i<40;i++){
 /* ================= FETCH ================= */
 async function fetchAir(lat,lon){
     const url=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}`+
-        `&current=us_aqi,pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`+
-        `&hourly=pm2_5,pm10&past_days=1&forecast_days=1&timezone=auto`;
+        `&current=us_aqi,pm2_5,pm10,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone,aerosol_optical_depth`+
+        `&hourly=pm2_5,pm10,carbon_monoxide&past_days=1&forecast_days=1&timezone=auto`;
     const r=await fetch(url); if(!r.ok) throw 0; return r.json();
 }
 
@@ -360,12 +393,12 @@ async function loadLocation(lat,lon,label){
     $('locLine').innerHTML=`Menampilkan data untuk <b>${label}</b>.`;
     $('timestamp').textContent='Sedang mengambil data kualitas udara terbaru.';
     $('dominant').textContent='—';
+    $('nowLine').style.display='none'; $('smokeBanner').style.display='none';
     try{
         const d=await fetchAir(lat,lon);
         state.data=d;
         state.hourlyAvg=calcPM24Avg(d.hourly,d.current.time);
-        const times=d.hourly.time; let idx=times.findIndex(t=>t>=d.current.time);
-        if(idx<0) idx=times.length;
+        const times=d.hourly.time; const idx=windowEnd(times,d.current.time);
         const st=Math.max(0,idx-24);
         state.trend=times.slice(st,idx).map((t,i)=>({t,v:d.hourly.pm2_5[st+i]}));
         render(); drawChart(); renderKecList();
@@ -379,20 +412,52 @@ async function loadLocation(lat,lon,label){
 function render(){
     const d=state.data; if(!d) return;
     const { value:ispu, param:dom, conc } = computeISPU(d.current, state.hourlyAvg);
-    const shown = state.mode==='ispu' ? ispu : (d.current.us_aqi ?? ispu);
-    const cat = state.mode==='ispu' ? ispuCategoryFor(ispu) : aqiCategoryFor(shown);
-    document.documentElement.style.setProperty('--ispu-color', cat.color);
-    $('ispuValue').textContent = shown;
-    $('ispuStatus').textContent = state.mode==='ispu' ? cat.label.toUpperCase() : cat.label.toUpperCase();
-    $('ispuCaption').textContent = cat.advice;
-    $('dominant').textContent = ISPU_PARAM_LABEL[dom] || dom;
-    $('timestamp').textContent = 'Diperbarui: ' + (d.current.time||'').replace('T',' ') + ' WIB'
-        + (state.hourlyAvg?.hours_used ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5?.toFixed(1)} µg/m³ (${state.hourlyAvg.hours_used}j)` : '');
-    $('scaleMarker').style.left = Math.min(100, shown/5) + '%';
+    const isIspu = state.mode==='ispu';
     const f=(v,u=0)=> v==null?'--':(+v).toFixed(u);
+
+    // rincian polutan (selalu diisi, walau indeks tidak bisa dihitung)
     $('v_pm25').textContent=f(conc.pm2_5); $('v_pm10').textContent=f(conc.pm10);
     $('v_o3').textContent=f(conc.o3);      $('v_no2').textContent=f(conc.no2);
     $('v_so2').textContent=f(conc.so2);    $('v_co').textContent=f(conc.co,2);
+
+    const shown = isIspu ? ispu : (d.current.us_aqi ?? null);
+    $('dominant').parentElement.style.display = isIspu ? '' : 'none';   // parameter dominan hanya relevan untuk ISPU
+    if (shown == null){
+        document.documentElement.style.setProperty('--ispu-color', '#8B96AB');
+        $('ispuValue').textContent='--';
+        $('ispuStatus').textContent='DATA TIDAK TERSEDIA';
+        $('ispuCaption').textContent='Model belum mengembalikan data untuk lokasi ini. Coba lagi beberapa saat.';
+        $('nowLine').style.display='none'; $('smokeBanner').style.display='none';
+        $('scaleMarker').style.left='0%';
+        return;
+    }
+    const cat = isIspu ? ispuCategoryFor(shown) : aqiCategoryFor(shown);
+    document.documentElement.style.setProperty('--ispu-color', cat.color);
+    $('ispuValue').textContent = shown;
+    $('ispuStatus').textContent = cat.label.toUpperCase();
+    $('ispuCaption').textContent = cat.advice;
+    $('dominant').textContent = ISPU_PARAM_LABEL[dom] || dom || '—';
+    const tz = tzLabel(d.utc_offset_seconds);
+    $('timestamp').textContent = 'Diperbarui: ' + (d.current.time||'').replace('T',' ') + (tz?' '+tz:'')
+        + (state.hourlyAvg?.pm2_5!=null ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5.toFixed(1)} µg/m³ (${state.hourlyAvg.hours_used}j)` : ' • rata-rata 24 jam belum lengkap, memakai nilai sesaat');
+    $('scaleMarker').style.left = Math.min(100, shown/5) + '%';
+
+    // kondisi saat ini (indikatif): PM2.5 sesaat, bukan ISPU resmi
+    const nowEl=$('nowLine');
+    const pmNow=d.current.pm2_5;
+    if (isIspu && pmNow!=null){
+        const nowIdx=subIndex(pmNow,BP.pm2_5), nowCat=ispuCategoryFor(nowIdx);
+        nowEl.style.display='';
+        nowEl.innerHTML=`Kondisi saat ini (indikatif): PM2.5 <b>${(+pmNow).toFixed(0)}</b> µg/m³ ≈ indeks <b>${nowIdx}</b> · ${nowCat.label}`
+            + `<small>PM2.5 jam terakhir, bukan rata-rata 24 jam; hanya gambaran tren, bukan ISPU resmi.</small>`;
+    } else nowEl.style.display='none';
+
+    // indikasi asap/kabut dari aerosol optical depth
+    const ban=$('smokeBanner'), aod=d.current.aerosol_optical_depth;
+    if (aod!=null && aod>=AOD_WARN){
+        ban.style.display='block';
+        ban.textContent=`Aerosol di atmosfer tinggi (AOD ${(+aod).toFixed(2)}) — ada indikasi asap/kabut. Nilai model bisa lebih rendah dari kondisi di lapangan; pakai masker bila udara terasa pekat.`;
+    } else ban.style.display='none';
 }
 
 /* ================= CHART ================= */
@@ -408,6 +473,8 @@ function drawChart(){
     const Y=v=>18+(1-(v-min)/((max-min)||1))*(h-62);
     x.strokeStyle='rgba(255,255,255,.08)'; x.lineWidth=1;
     for(let g=0;g<3;g++){ const gy=18+g*(h-62)/2; x.beginPath(); x.moveTo(pad,gy); x.lineTo(w-pad,gy); x.stroke(); }
+    x.fillStyle='#777'; x.font='10px sans-serif'; x.textAlign='left';
+    for(let g=0;g<3;g++){ const gy=18+g*(h-62)/2, val=max-(max-min)*g/2; x.fillText(val.toFixed(0), pad+2, gy-3); }
     const grad=x.createLinearGradient(0,0,0,h); grad.addColorStop(0,col+'44'); grad.addColorStop(1,col+'00');
     x.beginPath(); t.forEach((p,i)=> i?x.lineTo(X(i),Y(p.v)):x.moveTo(X(i),Y(p.v)));
     x.lineTo(X(t.length-1),h-40); x.lineTo(X(0),h-40); x.closePath(); x.fillStyle=grad; x.fill();
@@ -483,7 +550,7 @@ async function fetchAllKecamatan(){
     // + hourly=pm2_5,pm10 & past_days=1 → biar bisa hitung rata-rata 24 jam (sama seperti layar utama)
     const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lats}&longitude=${lons}` +
         `&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone` +
-        `&hourly=pm2_5,pm10&past_days=1&forecast_days=1&timezone=auto`;
+        `&hourly=pm2_5,pm10,carbon_monoxide&past_days=1&forecast_days=1&timezone=auto`;
     const res = await fetch(url);
     if(!res.ok) throw new Error('status ' + res.status);
     const data = await res.json();
@@ -581,7 +648,7 @@ function buildInfographicHTML(items){
             <div style="display:flex; flex-direction:column; gap:2px;">${rowsHTML}</div>
             <div style="margin-top:40px; padding-top:24px; border-top:1px solid #24324f; font-family:'Inter',sans-serif; font-size:13px; color:#8B96AB; line-height:1.6;">
                 Konsentrasi polutan dari Open-Meteo (model CAMS). Nilai ISPU dihitung otomatis memakai rumus &amp; ambang batas resmi Permen LHK No. P.14/2020, dari 6 dari 7 parameter (tanpa Hidrokarbon/HC). Titik koordinat = ibukota kecamatan.<br>
-                Bukan pengganti data resmi ISPU KLHK, dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. <br>
+                Estimasi model, bukan pengukuran stasiun; bukan pengganti data resmi ISPU KLHK dan bukan alat medis. Dibuat otomatis oleh aplikasi Udaraku. <br>
                 &copy; Raynold - 2026
             </div>
         </div>`;
@@ -948,7 +1015,7 @@ async function buildMapCanvas(items){
     ctx.fillStyle = '#8B96AB';
     const footerY = mapTop + mapH + 40;
     wrapCanvasText(ctx,
-        'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
+        'Bentuk wilayah: ilustrasi raster yang disederhanakan (bukan data batas administrasi yang dapat diunduh ulang). Warna tiap wilayah & kategori mengikuti ISPU Permen LHK No. P.14/2020, dari data Open-Meteo (model CAMS). Data berupa estimasi model (bukan pengukuran stasiun; nilai antar kecamatan berdekatan bisa sama). Label nama menandai titik ibukota kecamatan (koordinat diverifikasi manual). Raynold - 2026',
         PAD, footerY, W-PAD*2, 28);
 
     return canvas;
