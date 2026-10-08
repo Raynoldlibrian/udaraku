@@ -17,8 +17,8 @@
         animation:float linear infinite; transition:background .8s, box-shadow .8s; }
     @keyframes float { 0%{transform:translateY(105vh) translateX(0);opacity:0} 10%{opacity:.55} 90%{opacity:.35} 100%{transform:translateY(-10vh) translateX(60px);opacity:0} }
 
-    .topbar { position:sticky; top:0; z-index:50; background:linear-gradient(to bottom, rgba(10,10,10,.96) 70%, transparent);
-        backdrop-filter:blur(12px); width:100%; max-width:520px; margin:0 auto; padding:16px 20px 10px; }
+    .topbar { position:sticky; top:0; z-index:50; background:linear-gradient(to bottom, rgba(10,10,10,.02) 10%, transparent);
+         width:100%; max-width:520px; margin:0 auto; padding:16px 20px 10px; }
     .brand { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
     .brand-dot { width:10px; height:10px; border-radius:50%; background:var(--ispu-color); box-shadow:0 0 14px var(--ispu-color); transition:background .8s, box-shadow .8s; }
     .brand h1 { font-size:18px; letter-spacing:4px; text-transform:uppercase; }
@@ -28,7 +28,7 @@
     .loc-btn:hover { color:#fff; background:rgba(255,255,255,.14); }
     .caption { font-size:11px; color:#888; margin-bottom:6px; }
     .search-row { display:flex; gap:8px; }
-    .search-bar { flex:1; min-width:0; padding:12px 16px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); color:#fff; font-size:13px; }
+    .search-bar { flex:1; min-width:0; padding:12px 16px; border-radius:999px; background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.12); color:#fff; font-size:13px; }
     .search-bar::placeholder{color:#666}
     .search-bar:focus{outline:none;border-color:color-mix(in srgb,var(--ispu-color) 60%,transparent)}
     .btn-small { padding:12px 18px; border-radius:999px; border:none; cursor:pointer; background:var(--ispu-color); color:#000; font-weight:600; font-size:13px; flex-shrink:0; transition:background .8s; }
@@ -58,8 +58,9 @@
     .ispu-value { font-size:clamp(70px, 20vw, 100px); font-weight:200; line-height:1; color:var(--ispu-color);
         text-shadow:0 0 40px color-mix(in srgb, var(--ispu-color) 40%, transparent); transition:color .8s, text-shadow .8s; }
     .ispu-status { font-size:clamp(14px, 4vw, 18px); font-weight:300; letter-spacing:3px; text-transform:uppercase; margin:10px 0; }
-    .ispu-caption { font-size:12px; color:#999; max-width:360px; margin:0 auto 12px; line-height:1.7; padding:0 10px; }
-    .loc-line { font-size:13px; color:#999; margin-bottom:4px; }
+    .ispu-caption { font-size:12px; color:#999; max-width:360px; margin:0 auto 80px; line-height:1.7; padding:0 10px; }
+    .loc-line { font-size:12px; color:#bbb; margin:0 0 8px 4px; letter-spacing:.3px; }
+    .loc-line b { font-weight:600; color:#ddd; }
     .dom-line { font-size:12px; color:#777; margin-bottom:4px; }
     .timestamp { font-size:11px; color:#555; }
 
@@ -152,7 +153,7 @@
             </svg>
         </button>
     </div>
-    <div class="caption"></div>
+    <div class="loc-line" id="locLine"><b>Rengat, Riau</b></div>
     <div class="search-row">
         <input type="text" class="search-bar" id="searchInput" placeholder="Nama kota / koordinat (lat,lon)…">
         <button class="btn-small" id="btnCari">Cari</button>
@@ -173,7 +174,6 @@
         <div class="ispu-value" id="ispuValue">--</div>
         <div class="ispu-status" id="ispuStatus">MEMUAT DATA</div>
         <div class="ispu-caption" id="ispuCaption"></div>
-        <div class="loc-line" id="locLine">Menampilkan data untuk <b>Rengat, Riau</b>.</div>
         <div class="dom-line">Parameter dominan: <span id="dominant">—</span></div>
         <div class="timestamp" id="timestamp">Sedang mengambil data kualitas udara terbaru.</div>
         <div class="model-note">Estimasi model CAMS (Open-Meteo), bukan pengukuran stasiun.</div>
@@ -412,7 +412,7 @@ function buildScale(){
 }
 
 /* ================= PARTIKEL ================= */
-for (let i=0;i<40;i++){
+for (let i=0;i<100;i++){
     const p=document.createElement('div'), s=(Math.random()*4+3).toFixed(1);
     p.className='particle';
     p.style.cssText=`width:${s}px;height:${s}px;left:${Math.random()*100}%;opacity:${(Math.random()*.4+.2).toFixed(2)};animation-duration:${Math.random()*12+14}s;animation-delay:-${Math.random()*20}s`;
@@ -431,7 +431,7 @@ async function loadLocation(lat,lon,label){
     state.lat=lat; state.lon=lon; state.label=label;
     $('ispuValue').textContent='--'; $('ispuStatus').textContent='MEMUAT DATA';
     $('ispuCaption').textContent='';
-    $('locLine').innerHTML=`Menampilkan data untuk <b>${label}</b>.`;
+    $('locLine').innerHTML=`<b>${label}</b>`;
     $('timestamp').textContent='Sedang mengambil data kualitas udara terbaru.';
     $('dominant').textContent='—';
     $('dataNow').textContent='Data PM2.5 jam terakhir belum tersedia.'; $('dataWarning').classList.remove('show');
@@ -480,7 +480,7 @@ function render(){
     $('dominant').textContent = ISPU_PARAM_LABEL[dom] || dom || '—';
     const tz = tzLabel(d.utc_offset_seconds);
     $('timestamp').textContent = 'Diperbarui: ' + (d.current.time||'').replace('T',' ') + (tz?' '+tz:'')
-        + (state.hourlyAvg?.pm2_5!=null ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5.toFixed(1)} µg/m³ (${state.hourlyAvg.hours_used}j)` : ' • rata-rata 24 jam belum memenuhi 75% data valid');
+        + (state.hourlyAvg?.pm2_5!=null ? ` • PM²·⁵ avg: ${state.hourlyAvg.pm2_5.toFixed(1)} µg/m³ (${state.hourlyAvg.hours.pm2_5}j)` : ' • rata-rata 24 jam belum memenuhi 75% data valid');
     $('scaleMarker').style.left = Math.min(100, shown/5) + '%';
 
     // Informasi interpretasi dipindahkan ke card di bawah grafik agar tampilan utama tetap bersih.
