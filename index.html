@@ -134,6 +134,30 @@
     /* Hidden template for infographic rendering */
     .infographic-template { position:absolute; left:-9999px; top:0; }
     
+
+    /* ===== Peta interaktif ===== */
+    .map-wrap { overflow-y:auto; flex:1; min-height:0; padding-right:2px; }
+    .map-box { background:radial-gradient(ellipse at 50% 40%,#17344f,#0c1c2e); border:1px solid #234461; border-radius:16px; padding:4px; margin-top:10px; }
+    .map-box svg { width:100%; height:auto; display:block; }
+    .mk { stroke:#9fd0f2; stroke-width:2; stroke-linejoin:round; cursor:pointer; fill-opacity:.8; transition:fill-opacity .2s, stroke-width .2s; outline:none; }
+    .mk:hover, .mk:focus-visible { fill-opacity:.95; }
+    .mk.on { stroke:#fff; stroke-width:4; fill-opacity:1; }
+    .mk-lbl { fill:#f4f7fb; font-size:30px; font-weight:700; text-anchor:middle; pointer-events:none; paint-order:stroke; stroke:rgba(8,16,28,.92); stroke-width:6px; }
+    .mk-dot { stroke:#0b1220; stroke-width:3; pointer-events:none; }
+    .mk-ring { fill:none; stroke-width:2.5; transform-box:fill-box; transform-origin:center; animation:mkp 2.2s ease-out infinite; pointer-events:none; }
+    @keyframes mkp { from { transform:scale(.6); opacity:.95; } to { transform:scale(3.4); opacity:0; } }
+    @media (prefers-reduced-motion:reduce) { .mk-ring { animation:none; opacity:.6; } }
+    .map-info { margin-top:4px; padding:12px 14px; border-radius:14px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09); font-size:13px; color:#bbb; min-height:64px; }
+    .map-info b { color:#fff; font-size:15px; }
+    .map-info .mv { font-size:26px; font-weight:700; margin-right:8px; }
+    .map-actions { display:flex; gap:8px; margin-top:10px; }
+    .map-btn { flex:1; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.07); color:#eee; font-size:13px; cursor:pointer; }
+    .map-btn:disabled { opacity:.45; cursor:not-allowed; }
+    .map-btn.sq { flex:0 0 48px; font-size:16px; padding:0; }
+    .map-legend { display:flex; flex-wrap:wrap; gap:6px 12px; font-size:11px; color:#aaa; margin:10px 2px 0; }
+    .map-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+    .map-src { font-size:11px; color:#777; margin:10px 2px 4px; line-height:1.5; }
+
     @media (min-width:480px){ .sheet { max-width:480px; margin:0 auto; } }
 </style>
 </head>
@@ -243,6 +267,30 @@
     <h3>Pilih kecamatan (Indragiri Hulu)</h3>
     <div class="caption">Titik data = koordinat ibukota kecamatan (resolusi model kasar, nilai antar kecamatan bisa sama)</div>
     <div class="kec-list" id="kecList"></div>
+</div>
+
+<div class="sheet" id="mapSheet" role="dialog" aria-label="Peta sebaran ISPU">
+    <div class="sheet-handle"></div>
+    <h3>Peta Sebaran ISPU</h3>
+    <div class="caption" id="mapCaption">Ketuk kecamatan untuk melihat detail.</div>
+    <div class="map-wrap">
+        <div class="map-info" id="mapInfo">Ketuk salah satu kecamatan di peta.</div>
+        <div class="map-actions">
+            <button class="map-btn" id="mapUse" disabled>Lihat detail kecamatan</button>
+            <button class="map-btn" id="btnPetaPng"><span id="btnPetaPngText">Unduh PNG</span></button>
+            <button class="map-btn sq" id="mapReload" aria-label="Muat ulang data" title="Muat ulang data">↻</button>
+        </div>
+        <div class="map-box">
+            <svg id="mapSvg" viewBox="0 0 1000 1268" role="group" aria-label="Peta kecamatan Kabupaten Indragiri Hulu">
+                <defs><filter id="mkGlow" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+                <g id="mapG" filter="url(#mkGlow)"></g>
+                <g id="mapD"></g>
+                <g id="mapL"></g>
+            </svg>
+        </div>
+        <div class="map-legend" id="mapLegend"></div>
+        <div class="map-src">Warna = kategori ISPU (Permen LHK P.14/2020) dari estimasi model CAMS (Open-Meteo), bukan pengukuran stasiun. Nilai antar kecamatan berdekatan bisa sama. Titik = koordinat ibukota kecamatan; titik berdenyut = Tidak Sehat atau lebih buruk.</div>
+    </div>
 </div>
 
 <script>
@@ -1054,13 +1102,13 @@ async function buildMapCanvas(items){
 }
 
 async function generateMapPNG(){
-    const btn = $('btnPeta');
-    const btnText = $('btnPetaText');
+    const btn = $('btnPetaPng');
+    const btnText = $('btnPetaPngText');
     btn.disabled = true;
-    btnText.textContent = '⏳ Mengambil data…';
+    btnText.textContent = '⏳ Menyusun…';
     try{
-        const items = await fetchAllKecamatan();
-        btnText.textContent = '⏳ Menyusun peta…';
+        const fresh = mapItems && (Date.now() - mapLoadedAt < 600000);
+        const items = fresh ? mapItems : await fetchAllKecamatan();
         await document.fonts.ready;
         const canvas2 = await buildMapCanvas(items);
         const ok = await downloadCanvasAsPNG(canvas2, 'peta-sebaran-ispu-inhu');
@@ -1069,10 +1117,118 @@ async function generateMapPNG(){
         toast('Gagal menyusun peta: ' + err.message);
     }finally{
         btn.disabled = false;
-        btnText.textContent = 'Peta Sebaran';
+        btnText.textContent = 'Unduh PNG';
     }
 }
-$('btnPeta').addEventListener('click', generateMapPNG);
+$('btnPetaPng').addEventListener('click', generateMapPNG);
+
+/* ================= PETA INTERAKTIF ================= */
+const mapSheet = $('mapSheet');
+const PARAM_LABEL = { pm2_5:'PM2.5', pm10:'PM10', so2:'SO₂', no2:'NO₂', o3:'O₃', co:'CO' };
+let mapItems = null, mapLoadedAt = 0, mapSel = null, mapBuilt = false, mapBusy = false;
+const SVGNS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs, parent){
+    const e = document.createElementNS(SVGNS, tag);
+    for(const k in attrs) e.setAttribute(k, attrs[k]);
+    if(parent) parent.appendChild(e);
+    return e;
+}
+const mapColor = it => (it && it.cat) ? displayColor(it.cat) : '#8B96AB';
+function mapXY(k){
+    const x = (k.lon - MAP_BBOX.minLon) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * 1000;
+    const y = (MAP_BBOX.maxLat - k.lat) / (MAP_BBOX.maxLon - MAP_BBOX.minLon) * 1000;
+    return [x, y];
+}
+function buildMapOnce(){
+    if(mapBuilt) return;
+    mapBuilt = true;
+    const g = $('mapG'), d = $('mapD');
+    KECAMATAN_INHU.forEach(k=>{
+        const path = KEC_GEO[k.name];
+        if(!path) return;
+        const p = svgEl('path', { d:path, class:'mk', 'fill-rule':'evenodd', fill:'#8B96AB', 'data-n':k.name,
+            tabindex:'0', role:'button', 'aria-label':'Kecamatan ' + k.name }, g);
+        p.addEventListener('click', ()=> selectMapKec(k.name));
+        p.addEventListener('keydown', e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); selectMapKec(k.name); } });
+        const [x, y] = mapXY(k);
+        svgEl('circle', { class:'mk-ring', cx:x, cy:y, r:11, 'data-n':k.name, display:'none', stroke:'#8B96AB' }, d);
+        svgEl('circle', { class:'mk-dot', cx:x, cy:y, r:9, 'data-n':k.name, fill:'#8B96AB' }, d);
+    });
+    $('mapLegend').innerHTML = ISPU_CATEGORIES.map(c=>`<span><i style="background:${displayColor(c)}"></i>${c.label}</span>`).join('');
+}
+function paintMap(){
+    const by = {};
+    (mapItems || []).forEach(it => { by[it.kec.name] = it; });
+    document.querySelectorAll('#mapSvg [data-n]').forEach(el=>{
+        const it = by[el.getAttribute('data-n')];
+        const col = mapColor(it);
+        if(el.classList.contains('mk-ring')){
+            el.setAttribute('stroke', col);
+            el.setAttribute('display', (it && it.value != null && it.value > 100) ? 'inline' : 'none');
+        } else {
+            el.setAttribute('fill', col);
+        }
+    });
+    if(mapSel) selectMapKec(mapSel);
+}
+function selectMapKec(name){
+    mapSel = name;
+    document.querySelectorAll('#mapG .mk').forEach(p=> p.classList.toggle('on', p.getAttribute('data-n') === name));
+    const k = KECAMATAN_INHU.find(x => x.name === name);
+    const it = (mapItems || []).find(x => x.kec.name === name);
+    const lbl = $('mapL'); lbl.innerHTML = '';
+    const [x, y] = mapXY(k);
+    const t = svgEl('text', { class:'mk-lbl', x:Math.max(110, Math.min(890, x)), y:Math.max(40, y - 24) }, lbl);
+    t.textContent = name;
+    const info = $('mapInfo');
+    if(it && it.value != null){
+        const col = mapColor(it);
+        const dom = it.ispu && it.ispu.param ? PARAM_LABEL[it.ispu.param] : '—';
+        info.innerHTML = `<b>Kec. ${name}</b> <span style="color:#777">· ibukota ${k.ibukota}</span><br>` +
+            `<span class="mv" style="color:${col}">${it.value}</span><b style="color:${col}">${it.cat.label}</b><br>` +
+            `Parameter dominan: <b style="font-size:13px">${dom}</b>`;
+    } else {
+        info.innerHTML = `<b>Kec. ${name}</b> <span style="color:#777">· ibukota ${k.ibukota}</span><br>` +
+            (mapBusy ? 'Mengambil data…' : 'Data ISPU belum tersedia untuk kecamatan ini.');
+    }
+    $('mapUse').disabled = false;
+}
+async function refreshMapData(force){
+    if(mapBusy) return;
+    if(mapItems && !force && Date.now() - mapLoadedAt < 600000){ paintMap(); return; }
+    mapBusy = true;
+    $('mapCaption').textContent = 'Mengambil data 14 kecamatan…';
+    $('mapReload').disabled = true;
+    try{
+        mapItems = await fetchAllKecamatan();
+        mapLoadedAt = Date.now();
+        $('mapCaption').textContent = 'Diperbarui ' + new Date(mapLoadedAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' · ketuk kecamatan untuk detail';
+    }catch(err){
+        $('mapCaption').textContent = 'Gagal mengambil data (' + err.message + '). Ketuk ↻ untuk mencoba lagi.';
+    }finally{
+        mapBusy = false;
+        $('mapReload').disabled = false;
+        paintMap();
+    }
+}
+function openMap(){
+    buildMapOnce();
+    mapSheet.classList.add('open'); backdrop.classList.add('show');
+    refreshMapData(false);
+}
+function closeMap(){ mapSheet.classList.remove('open'); backdrop.classList.remove('show'); }
+$('btnPeta').addEventListener('click', openMap);
+$('mapReload').addEventListener('click', ()=> refreshMapData(true));
+$('mapUse').addEventListener('click', ()=>{
+    const k = KECAMATAN_INHU.find(x => x.name === mapSel);
+    if(!k) return;
+    closeMap();
+    loadLocation(k.lat, k.lon, `${k.name}, Riau`);
+    window.scrollTo({ top:0, behavior:'smooth' });
+});
+backdrop.onclick = ()=>{ closeSheet(); closeMap(); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ closeSheet(); closeMap(); } });
+
 
 /* ================= TOAST & REFRESH ================= */
 let toastT;
