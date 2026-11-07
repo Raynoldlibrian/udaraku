@@ -158,6 +158,11 @@
     .map-legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
     .map-src { font-size:11px; color:#777; margin:10px 2px 4px; line-height:1.5; }
 
+
+    /* ===== Pratinjau infografis ===== */
+    .ig-prev { margin-top:10px; border-radius:14px; overflow:hidden; background:#0B1220; border:1px solid #24324f; min-height:80px; }
+    .ig-scale { width:1080px; transform-origin:0 0; }
+
     @media (min-width:480px){ .sheet { max-width:480px; margin:0 auto; } }
 </style>
 </head>
@@ -290,6 +295,19 @@
         </div>
         <div class="map-legend" id="mapLegend"></div>
         <div class="map-src">Warna = kategori ISPU (Permen LHK P.14/2020) dari estimasi model CAMS (Open-Meteo), bukan pengukuran stasiun. Nilai antar kecamatan berdekatan bisa sama. Titik = koordinat ibukota kecamatan; titik berdenyut = Tidak Sehat atau lebih buruk.</div>
+    </div>
+</div>
+
+<div class="sheet" id="igSheet" role="dialog" aria-label="Pratinjau infografis">
+    <div class="sheet-handle"></div>
+    <h3>Infografis Kualitas Udara</h3>
+    <div class="caption" id="igCaption">Pratinjau infografis sebelum diunduh.</div>
+    <div class="map-actions" style="margin-top:0">
+        <button class="map-btn" id="igDownload" disabled><span id="igDownloadText">Unduh PNG</span></button>
+        <button class="map-btn sq" id="igReload" aria-label="Muat ulang data" title="Muat ulang data">↻</button>
+    </div>
+    <div class="map-wrap">
+        <div class="ig-prev" id="igPrev"><div class="ig-scale" id="igScale"></div></div>
     </div>
 </div>
 
@@ -761,17 +779,54 @@ async function downloadCanvasAsPNG(canvas, filenamePrefix){
     });
 }
 
-async function generateInfographic(){
-    const btn = $('btnInfografis');
-    const btnText = $('btnInfografisText');
-    btn.disabled = true;
-    btnText.textContent = '⏳ Mengambil data…';
+/* ===== Data bersama (peta & infografis) — cache 10 menit ===== */
+async function getKecItems(force){
+    if(!force && mapItems && Date.now() - mapLoadedAt < 600000) return mapItems;
+    const items = await fetchAllKecamatan();
+    mapItems = items; mapLoadedAt = Date.now();
+    return items;
+}
+
+/* ===== Infografis: tampil dulu di layar, baru diunduh ===== */
+const igSheet = $('igSheet');
+let igItems = null, igBusy = false;
+function fitIg(){
+    const prev = $('igPrev'), sc = $('igScale');
+    const k = prev.clientWidth / 1080;
+    if(!k) return;
+    sc.style.transform = `scale(${k})`;
+    prev.style.height = Math.ceil(sc.offsetHeight * k) + 'px';
+}
+function closeIg(){ igSheet.classList.remove('open'); backdrop.classList.remove('show'); }
+async function openInfographic(force){
+    igSheet.classList.add('open'); backdrop.classList.add('show');
+    if(igBusy) return;
+    igBusy = true;
+    $('igDownload').disabled = true; $('igReload').disabled = true;
+    $('igCaption').textContent = 'Mengambil data 14 kecamatan…';
     try{
-        const items = await fetchAllKecamatan();
-        btnText.textContent = '⏳ Menyusun gambar…';
-        $('infographicTemplate').innerHTML = buildInfographicHTML(items);
+        igItems = await getKecItems(!!force);
+        $('igScale').innerHTML = buildInfographicHTML(igItems);
+        if(document.fonts) await document.fonts.ready;
+        fitIg();
+        $('igCaption').textContent = 'Pratinjau · data ' + new Date(mapLoadedAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' · cek dulu, lalu unduh';
+        $('igDownload').disabled = false;
+    }catch(err){
+        $('igCaption').textContent = 'Gagal mengambil data (' + err.message + '). Ketuk ↻ untuk mencoba lagi.';
+    }finally{
+        igBusy = false;
+        $('igReload').disabled = false;
+    }
+}
+async function downloadInfographic(){
+    if(!igItems) return;
+    const btn = $('igDownload'), txt = $('igDownloadText');
+    btn.disabled = true;
+    txt.textContent = '⏳ Menyusun…';
+    try{
+        $('infographicTemplate').innerHTML = buildInfographicHTML(igItems);
         await loadHtml2Canvas();
-        await document.fonts.ready;
+        if(document.fonts) await document.fonts.ready;
         await new Promise(r => setTimeout(r, 150));
         const canvas1 = await window.html2canvas($('infographicTemplate').firstElementChild, {
             backgroundColor: '#0B1220',
@@ -784,11 +839,14 @@ async function generateInfographic(){
         toast('Gagal menyusun infografis: ' + err.message);
     }finally{
         btn.disabled = false;
-        btnText.textContent = 'Infografis';
+        txt.textContent = 'Unduh PNG';
         $('infographicTemplate').innerHTML = '';
     }
 }
-$('btnInfografis').addEventListener('click', generateInfographic);
+$('btnInfografis').addEventListener('click', ()=> openInfographic(false));
+$('igReload').addEventListener('click', ()=> openInfographic(true));
+$('igDownload').addEventListener('click', downloadInfographic);
+window.addEventListener('resize', ()=>{ if(igSheet.classList.contains('open')) fitIg(); });
 
 /* ================= PETA SEBARAN (kode asli) ================= */
 
@@ -1107,8 +1165,7 @@ async function generateMapPNG(){
     btn.disabled = true;
     btnText.textContent = '⏳ Menyusun…';
     try{
-        const fresh = mapItems && (Date.now() - mapLoadedAt < 600000);
-        const items = fresh ? mapItems : await fetchAllKecamatan();
+        const items = await getKecItems(false);
         await document.fonts.ready;
         const canvas2 = await buildMapCanvas(items);
         const ok = await downloadCanvasAsPNG(canvas2, 'peta-sebaran-ispu-inhu');
@@ -1200,8 +1257,7 @@ async function refreshMapData(force){
     $('mapCaption').textContent = 'Mengambil data 14 kecamatan…';
     $('mapReload').disabled = true;
     try{
-        mapItems = await fetchAllKecamatan();
-        mapLoadedAt = Date.now();
+        mapItems = await getKecItems(true);
         $('mapCaption').textContent = 'Diperbarui ' + new Date(mapLoadedAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' }) + ' · ketuk kecamatan untuk detail';
     }catch(err){
         $('mapCaption').textContent = 'Gagal mengambil data (' + err.message + '). Ketuk ↻ untuk mencoba lagi.';
@@ -1226,8 +1282,8 @@ $('mapUse').addEventListener('click', ()=>{
     loadLocation(k.lat, k.lon, `${k.name}, Riau`);
     window.scrollTo({ top:0, behavior:'smooth' });
 });
-backdrop.onclick = ()=>{ closeSheet(); closeMap(); };
-document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ closeSheet(); closeMap(); } });
+backdrop.onclick = ()=>{ closeSheet(); closeMap(); closeIg(); };
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape'){ closeSheet(); closeMap(); closeIg(); } });
 
 
 /* ================= TOAST & REFRESH ================= */
